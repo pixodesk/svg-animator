@@ -1,26 +1,49 @@
 {
   "name": "@pixodesk/svg-animator-web",
   "version": "0.0.0",
+  "description": "Pixodesk SVG animator for web browsers",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "browser": "dist/index.umd.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     }
   },
-  "files": [
-    "dist"
-  ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "prepare": "npm run build",    
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "build": "eslint src/ && tsup",
+    "start": "node dist/index.cjs",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npm run build && cp dist/index.umd.js e2e/fixtures/ && npx playwright test",
+    "test:e2e:ui": "npm run build && cp dist/index.umd.js e2e/fixtures/ && npx playwright test --ui",
+    "test:e2e:update": "npm run build && cp dist/index.umd.js e2e/fixtures/ && npx playwright test --update-snapshots",
+    
+    "wip-test:e2e": "npm run build && cp dist/index.umd.js e2e/fixtures/ && npx playwright test --grep @wip",
+    "wip-test:e2e:ui": "npm run build && cp dist/index.umd.js e2e/fixtures/ && npx playwright test --grep @wip --ui",
+    "wip-test:e2e:update": "npm run build && cp dist/index.umd.js e2e/fixtures/ && npx playwright test --grep @wip --update-snapshots"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "eslint": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
+    "fs-extra": "^11.2.0",
+    "@types/fs-extra": "^11.0.4",
+    "terser": "^5.37.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@playwright/test": "^1.48.0",
+    "jsdom": "^25.0.0",
+    "serve": "^14.2.0",
+    "vitest": "^2.0.0"
   }
 }
