@@ -4,7 +4,7 @@
  *---------------------------------------------------------------------------------------*/
 
 import { renderNode } from './PxAnimatorDOM';
-import { createFrameLoopAnimator } from './PxAnimatorFrameLoop';
+import { createFrameLoopAnimator, PxPlatformAdapter } from './PxAnimatorFrameLoop';
 import { setupAnimationTriggers } from './PxAnimatorTriggers';
 import { getAnimatorConfig, isPxElementFileFormat, PX_ANIM_ATTR_NAME, PX_ANIM_SRC_ATTR_NAME, type PxAnimatedSvgDocument, type PxAnimatorAPI, type PxAnimatorCallbacksConfig } from './PxAnimatorTypes';
 import { createWebApiAnimator } from './PxAnimatorWebApi';
@@ -16,6 +16,7 @@ import { createWebApiAnimator } from './PxAnimatorWebApi';
  */
 function createAnimatorFromConfig(
     doc: PxAnimatedSvgDocument,
+    adapter?: PxPlatformAdapter,
     callbacks?: PxAnimatorCallbacksConfig,
     rootElement?: Element | null
 ): PxAnimatorAPI {
@@ -25,14 +26,14 @@ function createAnimatorFromConfig(
     let res: PxAnimatorAPI;
     if (animatorConfig.mode === 'frames') {
         // Forcing "frames", even if "webapi" can be used
-        res = createFrameLoopAnimator(doc, callbacks, rootElement);
+        res = createFrameLoopAnimator(doc, adapter, callbacks, rootElement);
     } else {
         // Trying "webapi" first
         res = (
             createWebApiAnimator(doc, callbacks, rootElement,
                 animatorConfig.mode === 'webapi' // Forcing "webapi"
             ) ||
-            createFrameLoopAnimator(doc, callbacks, rootElement) // "webapi" has unsupported attrs and wasn't forced, returned null, fallback to "frames"
+            createFrameLoopAnimator(doc, adapter, callbacks, rootElement) // "webapi" has unsupported attrs and wasn't forced, returned null, fallback to "frames"
         );
     }
 
@@ -85,7 +86,7 @@ function deepClone<T>(value: T): T {
  * @param doc - The animated SVG document to process
  * @returns A new document with regenerated IDs
  */
-function generateNewIds(doc: PxAnimatedSvgDocument): PxAnimatedSvgDocument {
+export function generateNewIds(doc: PxAnimatedSvgDocument): PxAnimatedSvgDocument {
     // Deep clone the document
     const cloned: PxAnimatedSvgDocument = deepClone(doc);
 
@@ -209,6 +210,7 @@ function replaceUrlRefs(value: string, idMap: Map<string, string>): string {
  */
 export function createAnimatorImpl(
     doc: PxAnimatedSvgDocument,
+    adapter?: PxPlatformAdapter,
     callbacks?: PxAnimatorCallbacksConfig,
     containerElement?: string | Element
 ): PxAnimatorAPI {
@@ -236,7 +238,7 @@ export function createAnimatorImpl(
         }
     }
 
-    return createAnimatorFromConfig(doc, callbacks, rootElement);
+    return createAnimatorFromConfig(doc, adapter, callbacks, rootElement);
 }
 
 /**
@@ -250,12 +252,13 @@ export function createAnimatorImpl(
  */
 export function createAnimator(
     docOrUrl: PxAnimatedSvgDocument | string,
+    adapter?: PxPlatformAdapter,
     callbacks?: PxAnimatorCallbacksConfig,
     containerElement?: string | Element
 ): PxAnimatorAPI {
 
     if (typeof docOrUrl === 'object') {
-        return createAnimatorImpl(docOrUrl, callbacks, containerElement);
+        return createAnimatorImpl(docOrUrl, adapter, callbacks, containerElement);
     }
 
     // URL provided - fetch and create animator
@@ -263,7 +266,7 @@ export function createAnimator(
 
     fetch(docOrUrl).then(res => res.json()).then(json => {
         if (isPxElementFileFormat(json)) {
-            animator = createAnimatorImpl(json, callbacks, containerElement);
+            animator = createAnimatorImpl(json, adapter, callbacks, containerElement);
         } else {
             console.error('Invalid animation document format');
         }
@@ -296,7 +299,7 @@ export function loadTagAnimators() {
         if (!(element as any)[PX_ANIM_ATTR_NAME]) {
             const src = element.getAttribute(PX_ANIM_SRC_ATTR_NAME);
             if (src) {
-                (element as any)[PX_ANIM_ATTR_NAME] = createAnimator(src, undefined, element);
+                (element as any)[PX_ANIM_ATTR_NAME] = createAnimator(src, undefined, undefined, element);
             }
         }
     }

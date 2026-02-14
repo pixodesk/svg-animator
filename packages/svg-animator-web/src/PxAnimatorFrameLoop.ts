@@ -388,6 +388,7 @@ export function createBasicFrameLoopAnimator(
  */
 export function createFrameLoopAnimator(
     doc: PxAnimatedSvgDocument,
+    adapter?: PxPlatformAdapter,
     callbacks?: PxAnimatorCallbacksConfig,
     rootElement?: Element | null
 ): PxAnimatorAPI {
@@ -405,6 +406,21 @@ export function createFrameLoopAnimator(
         }
     }
 
+    let api = createBasicFrameLoopAnimator(
+        doc, 
+        adapter || createDomAdapter(rootElement), 
+        callbacks
+    );
+
+    api = {
+        ...api,
+        "getRootElement": () => rootElement || null
+    };
+    if (config.trigger) setupAnimationTriggers(api, config.trigger);
+    return api;
+}
+
+export function createDomAdapter(rootElement?: Element | null) {
     // Track warnings to avoid spamming console
     const warnedSelectors = new Set<string>();
 
@@ -436,13 +452,5 @@ export function createFrameLoopAnimator(
             }
         },
     };
-
-
-    let api = createBasicFrameLoopAnimator(doc, adapter, callbacks);
-    api = {
-        ...api,
-        "getRootElement": () => rootElement || null
-    };
-    if (config.trigger) setupAnimationTriggers(api, config.trigger);
-    return api;
+    return adapter;
 }

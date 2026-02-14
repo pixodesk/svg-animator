@@ -75,7 +75,7 @@ export interface PxAnimationDefinition {
  */
 export interface PxTrigger {
     /** Event that starts the animation */
-    startOn: 'load' | 'mouseOver' | 'click' | 'scrollIntoView' | 'programmatic';
+    startOn?: 'load' | 'mouseOver' | 'click' | 'scrollIntoView' | 'programmatic';
 
     /** Action to take when the trigger condition is no longer met (e.g., mouse leaves) */
     outAction?: 'continue' | 'pause' | 'reset' | 'reverse';
@@ -236,9 +236,6 @@ export interface PxSvgNode extends PxNode {
  * This is the root type for the entire file format.
  */
 export interface PxAnimatedSvgDocument extends PxSvgNode {
-    /** FIXME - do we need it?
-     * Must be "svg" for root element */
-    type: 'svg';
 }
 
 // ============================================================================

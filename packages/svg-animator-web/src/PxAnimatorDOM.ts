@@ -60,18 +60,8 @@ function resolveStyle(
 }
 
 
-/**
- * Renders a PxNode tree to DOM elements.
- */
-export function renderNode(node: PxNode, defs?: PxDefs): Element | null {
-    if (!node) return null;
-
-    const { type, children, animate, style, ...props } = node;
-
-    // Extract defs from root svg node
-    const nodeDefs = (node as any).defs || defs;
-
-    const propsCopy: Record<string, string> = {};
+export function getNormalizedProps(props: Record<string, any>) {
+    const propsCopy: Record<string, any> = {};
 
     // Process regular attributes
     for (const key of Object.keys(props)) {
@@ -93,6 +83,20 @@ export function renderNode(node: PxNode, defs?: PxDefs): Element | null {
         }
     }
 
+    return propsCopy;
+}
+
+/**
+ * Renders a PxNode tree to DOM elements.
+ */
+export function renderNode(node: PxNode, defs?: PxDefs): Element | null {
+    if (!node) return null;
+
+    const { type, children, animate, style, ...props } = node;
+
+    // Extract defs from root svg node
+    const nodeDefs = (node as any).defs || defs;
+
     // Resolve style reference
     const resolvedStyle = resolveStyle(style, nodeDefs);
 
@@ -108,5 +112,10 @@ export function renderNode(node: PxNode, defs?: PxDefs): Element | null {
         }
     }
 
-    return createElement(type || 'g', propsCopy, resolvedStyle, childElements);
+    return createElement(
+        type || 'g',
+        getNormalizedProps(props),
+        resolvedStyle,
+        childElements
+    );
 }

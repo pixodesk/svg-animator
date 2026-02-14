@@ -3,7 +3,7 @@
  * Licensed under the MIT License. See the LICENSE file in the project root for details.
  *---------------------------------------------------------------------------------------*/
 
-export { createAnimator, createAnimatorImpl, loadTagAnimators } from './PxAnimator';
+export { createAnimator, createAnimatorImpl, generateNewIds, loadTagAnimators } from './PxAnimator';
 
 // Types
 export type {
@@ -36,7 +36,7 @@ export {
 } from './PxAnimatorTypes';
 
 export { PX_ANIM_ATTR_NAME, PX_ANIM_SRC_ATTR_NAME } from './PxAnimatorTypes';
-export { COLOUR_ATTR_NAMES, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
+export { camelCaseToKebabWordIfNeeded, COLOUR_ATTR_NAMES, STYLE_ATTR_NAMES, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
 
 
 
@@ -50,7 +50,8 @@ export {
 } from './PxDefinitions';
 
 // Low-level APIs (for advanced usage)
-export { renderNode } from './PxAnimatorDOM';
+export { getNormalizedProps, renderNode } from './PxAnimatorDOM';
 export { createBasicFrameLoopAnimator, createFrameLoopAnimator } from './PxAnimatorFrameLoop';
 export type { PxPlatformAdapter } from './PxAnimatorFrameLoop';
 export { createWebApiAnimator } from './PxAnimatorWebApi';
+

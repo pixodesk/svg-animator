@@ -19,7 +19,7 @@ describe("animateBackground", () => {
     });
 
     it("createAnimator", async () => {
-        createAnimator(getTestJson(), undefined, '#aaa');
+        createAnimator(getTestJson(), undefined, undefined, '#aaa');
 
         const ellipse = document.querySelector("ellipse");
         expect(ellipse).not.toBeNull();

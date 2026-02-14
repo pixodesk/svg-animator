@@ -1,0 +1,110 @@
+{
+  "type": "svg",
+  "id": "_px_2qnscfu5",
+  "viewBox": "0 0 400 400",
+  "preserveAspectRatio": "none",
+  "fill": "none",
+  "animator": {
+    "duration": 1000,
+    "iterations": 2,
+    "direction": "normal",
+    "type": "javaScript",
+    "mode": "auto",
+    "timeline": "time",
+    "trigger": {
+      "startOn": "load"
+    }
+  },
+  "children": [
+    {
+      "type": "ellipse",
+      "id": "_px_2ri672k8",
+      "className": "_px_2r29235p _px_2r29235p _px_2r29235p _px_2r29235p _px_2r29235p _px_2r29235p _px_2r29235p _px_2r29235p _px_2r29235p",
+      "fill": "#007fff85",
+      "stroke": "#003a73",
+      "transform": "translate(139.6604,163.8499)",
+      "animate": {
+        "fill": {
+          "keyframes": [
+            {
+              "t": 0,
+              "v": "#007fff85"
+            },
+            {
+              "t": 1000,
+              "v": "#ff020085"
+            }
+          ]
+        },
+        "translate": {
+          "keyframes": [
+            {
+              "t": 0,
+              "v": [
+                139.6604,
+                163.8499
+              ]
+            },
+            {
+              "t": 1000,
+              "v": [
+                139.6604,
+                310.3879
+              ]
+            }
+          ]
+        }
+      },
+      "rx": 64.0253,
+      "ry": 64.0253,
+      "meta": {
+        "transform": {
+          "translate": {
+            "keyframes": [
+              {
+                "t": 0,
+                "v": [
+                  139.6604,
+                  163.8499
+                ]
+              },
+              {
+                "t": 1000,
+                "v": [
+                  139.6604,
+                  310.3879
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "path",
+      "id": "_px_2ri672k7",
+      "className": "_px_2r29c1mo _px_2r29c1mo _px_2r29c1mo _px_2r29c1mo _px_2r29c1mo _px_2r29c1mo _px_2r29c1mo _px_2r29c1mo _px_2r29c1mo",
+      "fill": "#ff020085",
+      "stroke": "#003a73",
+      "transform": "translate(175.7467,371.8192)",
+      "animate": {
+        "d": {
+          "keyframes": [
+            {
+              "t": 0,
+              "v": "M0,0L103.4944,-98.286L128.4891,1.4987L0,0z"
+            },
+            {
+              "t": 1000,
+              "v": "M0,0L157.1641,-191.0395L128.4891,1.4987L0,0z"
+            }
+          ]
+        }
+      },
+      "d": "M0,0L103.4944,-98.286L128.4891,1.4987L0,0z",
+      "meta": {
+        "label": "a \" <a/> a"
+      }
+    }
+  ]
+}

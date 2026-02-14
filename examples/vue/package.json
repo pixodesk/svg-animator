@@ -1,0 +1,24 @@
+{
+  "name": "@pixodesk/example-vue",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5.27"
+  },
+  "peerDependencies": {
+    "@pixodesk/svg-animator-web": "workspace:*",
+    "@pixodesk/svg-animator-vue": "workspace:*"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "typescript": "^5.5.3",
+    "vite": "^6.3.5"
+  }
+}
