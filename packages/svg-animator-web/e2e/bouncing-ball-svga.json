@@ -1,0 +1,143 @@
+{
+  "type": "svg",
+  "id": "_px_2p4d44pl",
+  "viewBox": "0 0 400 400",
+  "width": 400,
+  "height": 400,
+  "fill": "none",
+  "animator": {
+    "duration": 1000,
+    "direction": "normal",
+    "iterations": "infinite",
+    "type": "javaScript",
+    "mode": "frames",
+    "timeline": "time",
+    "trigger": {
+      "startOn": "load",
+      "outAction": "pause"
+    }
+  },
+  "children": [
+    {
+      "type": "g",
+      "id": "_px_2rrmqe46",
+      "transform": "translate(200.1185,41.3612)",
+      "animate": {
+        "translate": {
+          "keyframes": [
+            {
+              "t": 0,
+              "v": [
+                200.1185,
+                41.3612
+              ],
+              "e": [
+                0.3333,
+                0,
+                0.6667,
+                0.3333
+              ]
+            },
+            {
+              "t": 500,
+              "v": [
+                200.1185,
+                359.3975
+              ],
+              "e": [
+                0.3333,
+                0.6667,
+                0.6667,
+                1
+              ]
+            },
+            {
+              "t": 1000,
+              "v": [
+                200.1185,
+                41.3612
+              ]
+            }
+          ]
+        }
+      },
+      "meta": {
+        "elementEffect": {
+          "baseId": "_px_2rrmqe45",
+          "transform": {
+            "translate": {
+              "keyframes": [
+                {
+                  "t": 0,
+                  "v": [
+                    200.1185,
+                    41.3612
+                  ],
+                  "e": [
+                    0.3333,
+                    0,
+                    0.6667,
+                    0.3333
+                  ]
+                },
+                {
+                  "t": 500,
+                  "v": [
+                    200.1185,
+                    359.3975
+                  ],
+                  "e": [
+                    0.3333,
+                    0.6667,
+                    0.6667,
+                    1
+                  ]
+                },
+                {
+                  "t": 1000,
+                  "v": [
+                    200.1185,
+                    41.3612
+                  ]
+                }
+              ]
+            },
+            "scale": [
+              25.2234,
+              25.2234
+            ]
+          }
+        }
+      },
+      "children": [
+        {
+          "type": "ellipse",
+          "id": "_px_2rrmqe45",
+          "fill": "#0087ff",
+          "stroke": "#ffffff",
+          "rx": 159.7917,
+          "ry": 159.7917,
+          "transform": "scale(0.2522,0.2522)"
+        }
+      ]
+    },
+    {
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#000000",
+      "strokeWidth": 8,
+      "transform": "translate(200.1185,41.3612)scale(0.2522,0.2522)",
+      "rx": 159.7917,
+      "ry": 159.7917
+    },
+    {
+      "type": "ellipse",
+      "fill": "none",
+      "stroke": "#000000",
+      "strokeWidth": 8,
+      "transform": "translate(200.1185,359.3975)scale(0.2522,0.2522)",
+      "rx": 159.7917,
+      "ry": 159.7917
+    }
+  ]
+}

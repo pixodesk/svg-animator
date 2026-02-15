@@ -1,4 +1,13 @@
 import { expect, Page, test } from "@playwright/test";
+import _animationJson from "./bouncing-ball-svga.json" with { type: "json" };
+import { PxAnimatedSvgDocument, isPxElementFileFormat } from "../src/index";
+
+
+const animationJson: PxAnimatedSvgDocument = _animationJson;
+
+if (!isPxElementFileFormat(_animationJson)) {
+    throw new Error("Animation does not match PxAnimatedSvgDocument format");
+}
 
 
 const START_TIME = 100000000;
@@ -31,6 +40,16 @@ test.describe("animate-basic", () => {
         // Install fake timers before navigating
         await page.clock.install({ time: START_TIME });
         await page.clock.setFixedTime(START_TIME);
+
+        // Intercept animation.json requests before navigating
+        await page.route('**/animation.json', async route => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(animationJson),
+            });
+        });
+
         await page.goto("/animate-basic.html");
     });
 
