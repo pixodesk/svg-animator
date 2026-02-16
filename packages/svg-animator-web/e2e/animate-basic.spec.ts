@@ -1,12 +1,18 @@
 import { expect, Page, test } from "@playwright/test";
 import { isPxElementFileFormat, PxAnimatedSvgDocument } from "../src/index";
-import _animationJson from "./bouncing-ball-svga.json" with { type: "json" };
+import _bouncingBallJson from "./bouncing-ball-svga.json" with { type: "json" };
+import _animatedAttributeJson from "./03-animated-attribute.json" with { type: "json" };
 
 
-if (!isPxElementFileFormat(_animationJson)) {
+if (!isPxElementFileFormat(_bouncingBallJson)) {
     throw new Error("Animation does not match PxAnimatedSvgDocument format");
 }
-const animationJson: PxAnimatedSvgDocument = _animationJson;
+const bouncingBallJson: PxAnimatedSvgDocument = _bouncingBallJson;
+
+if (!isPxElementFileFormat(_animatedAttributeJson)) {
+    throw new Error("Animation does not match PxAnimatedSvgDocument format");
+}
+const animatedAttributeJson: PxAnimatedSvgDocument = _animatedAttributeJson;
 
 
 const START_TIME = 100000000;
@@ -39,31 +45,38 @@ test.describe("animate-basic", () => {
         // Install fake timers before navigating
         await page.clock.install({ time: START_TIME });
         await page.clock.setFixedTime(START_TIME);
+    });
 
-        // Intercept animation.json requests before navigating
-        await page.route('**/animation.json', async route => {
-            await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify(animationJson),
+    function testAnimation(name: string, animationJson: PxAnimatedSvgDocument) {
+        test(name, async ({ page }) => {
+
+            // Intercept animation.json requests before navigating
+            await page.route('**/animation.json', async route => {
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify(animationJson),
+                });
             });
+
+            await page.goto("/animate-basic.html");
+
+            ////////////////////////////////////////////////////////////////
+
+            const svg = page.locator("svg").first();
+
+            await expect(svg).toHaveScreenshot(name + "-start.png");
+
+            await advanceTimeIncrementally(page, START_TIME + 0, START_TIME + 500);
+
+            await expect(svg).toHaveScreenshot(name + "-middle.png");
+
+            await advanceTimeIncrementally(page, START_TIME + 500, START_TIME + 1000);
+
+            await expect(svg).toHaveScreenshot(name + "-end.png");
         });
+    }
 
-        await page.goto("/animate-basic.html");
-    });
-
-    test("animation changes over time", async ({ page }) => {
-
-        const svg = page.locator("svg").first();
-
-        await expect(svg).toHaveScreenshot("animation-start.png");
-
-        await advanceTimeIncrementally(page, START_TIME + 0, START_TIME + 500);
-
-        await expect(svg).toHaveScreenshot("animation-middle.png");
-
-        await advanceTimeIncrementally(page, START_TIME + 500, START_TIME + 1000);
-
-        await expect(svg).toHaveScreenshot("animation-end.png");
-    });
+    testAnimation('Bouncing ball', bouncingBallJson);
+    testAnimation('Animated attribute', animatedAttributeJson);
 });
