@@ -1,10 +1,10 @@
-import { PxAnimatedSvgDocument } from '@pixodesk/svg-animator-web';
-import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, cleanup } from "@testing-library/vue";
 import PixodeskSvgAnimator from './PixodeskSvgAnimator';
+import { PxAnimatedSvgDocument } from '@pixodesk/svg-animator-web';
 
 
-describe("ReactAnimator", () => {
+describe("VueAnimator", () => {
     beforeEach(() => {
         vi.useFakeTimers();
     });
@@ -15,7 +15,12 @@ describe("ReactAnimator", () => {
     });
 
     it("renders and animates", async () => {
-        render(<PixodeskSvgAnimator doc={getTestJson()} autoplay />);
+        render(PixodeskSvgAnimator, {
+            props: {
+                doc: getTestJson(),
+                autoplay: true,
+            },
+        });
 
         const ellipse = document.querySelector("ellipse");
         expect(ellipse).not.toBeNull();
