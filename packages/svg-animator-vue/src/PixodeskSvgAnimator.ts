@@ -1,7 +1,7 @@
 import type { PxAnimatedSvgDocument, PxAnimatorAPI, PxNode, PxPlatformAdapter, PxTrigger } from '@pixodesk/svg-animator-web';
 import { camelCaseToKebabWordIfNeeded, createAnimator, FillMode, generateNewIds, getNormalizedProps, STYLE_ATTR_NAMES } from '@pixodesk/svg-animator-web';
 import {
-    computed, defineComponent, h, onUnmounted, ref, shallowRef, type PropType, type VNode,
+    computed, defineComponent, h, onMounted, onUnmounted, ref, shallowRef, type PropType, type VNode,
     watch,
 } from 'vue';
 
@@ -294,11 +294,11 @@ const PixodeskSvgAnimator = defineComponent({
             apiRef.value = null;
         }
 
+        // Create the animator once DOM refs are available.
+        onMounted(() => createApi());
+
         // Recreate the animator when the resolved doc changes.
-        watch(resolvedDoc, () => {
-            // Defer creation to next tick so DOM refs are up-to-date.
-            queueMicrotask(() => createApi());
-        }, { immediate: true });
+        watch(resolvedDoc, () => createApi());
 
         // Sync declarative play/pause props with the animator.
         watch([compMode, () => props.play, () => props.pause], () => {
