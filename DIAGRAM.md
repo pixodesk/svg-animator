@@ -1,0 +1,1 @@
+![Pixodesk SVG Animator Diagram](pixodesk-svg-animator--flow.drawio.svg)
