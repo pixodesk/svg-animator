@@ -224,13 +224,8 @@ const PixodeskSvgAnimatorImpl: FC<PixodeskSvgAnimatorImplProps> = ({
         const normProps = getNormalizedProps(props);
 
         normProps['ref'] = (domEl: any) => {
-            console.log('MOUNTED');
-
             if (node['id']) elementRefs.current.set(node['id'], domEl);
-
-            return () => {
-                console.log('UN-MOUNTED');
-            };
+            // return () => {};
         };
 
         return createElement(type, normProps, children?.map(child => renderNode(child)));
@@ -395,8 +390,6 @@ const PixodeskSvgAnimator: FC<PixodeskSvgAnimatorProps> = ({
             }
         };
     }
-
-    console.log('doc', doc);
 
     const apiHolderRef = useRef<PxAnimatorAPI | null>(null);
 
