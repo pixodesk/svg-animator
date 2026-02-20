@@ -1,6 +1,6 @@
 {
   "name": "@pixodesk/svg-animator-vue",
-  "version": "0.0.0",
+  "version": "1.0.7",
   "description": "Pixodesk SVG animator for Vue",
   "license": "MIT",
   "repository": {
