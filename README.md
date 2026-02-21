@@ -25,7 +25,7 @@ Those file formats are interchangeable — the editor can convert between them a
 
 Two export formats:
 
-- **JSON file** — the most flexible format. Animation data, structure, and metadata in a single file; JavaScript renders the DOM and drives the animation at runtime.
+- **JSON file** — the most flexible format. Animation data, structure, and metadata in a single file; JavaScript renders the DOM and drives the animation at runtime. Use with `@pixodesk/svg-animator-web`, `@pixodesk/svg-animator-react`, `@pixodesk/svg-animator-vue`.
 - **SVG file** — a pre-rendered SVG with animation embedded directly in the file. Self-contained. Three flavors:
   - **SVG + CSS-Keyframes** — animation defined in a `<style>` block
     - *No `<script>` tag* — zero JavaScript
