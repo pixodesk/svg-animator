@@ -77,7 +77,7 @@ function sanitiseAttributeValue(name: string, value: any): any | undefined {
 
     // fill/stroke accept plain color values (e.g. "red", "#ff0000") in addition to
     // url(#id) references. If a url() is present it must reference an internal id.
-    if (nameLower === 'fill' || nameLower === 'stroke') {
+    if (nameLower === 'fill' || nameLower === 'stroke' || nameLower === 'stopColor') {
         const str = String(value);
         if (str.includes('url(') && !/^url\(#[^)]+\)$/.test(str)) {
             console.warn('Attribute "' + nameLower + '" blocked: url() references must be internal url(#id), got:', value);
