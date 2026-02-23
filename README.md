@@ -5,7 +5,8 @@
 
 # 🚧 **Status - This project is currently under development.**
 
-<img src="boat.svg" width="100%"/>
+<!-- <img src="boat.svg" width="100%"/> -->
+<video  src="boat.mp4" autoplay  muted loop playsinline style="width: 100%; height: auto; display: block;"></video>
 
 
 This repository contains the official runtime libraries for playing SVG animations created with the [Pixodesk SVG Animation](https://pixodesk.com) editor.
