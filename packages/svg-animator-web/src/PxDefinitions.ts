@@ -415,11 +415,6 @@ function expandLoopKeyframes(
                 return;
             }
 
-            // Skip first keyframe of non-first reps to avoid duplicates at junctions
-            if (i === 0 && looped.length > 0 && Math.abs(entry.relT) < 1e-9) {
-                continue;
-            }
-
             looped.push({
                 t: repStart + entry.relT * segDuration,
                 v: entry.v,
@@ -445,20 +440,13 @@ function expandLoopKeyframes(
         const isReversed = !!loop.alternate && (fullReps % 2 === 0);
         const repStart = fillStart + fullReps * segDuration;
         appendRep(repStart, isReversed, partialFraction);
-    }
+    }   
 
-    // Assemble: skip the junction duplicate between original and looped
+    // Assemble: looped keyframes go before or after the original keyframes.
+    // No junction deduplication — cycle mode relies on value jumps at boundaries.
     if (loop.before) {
-        // Looped keyframes come before original. Remove last looped kf if it matches firstT.
-        if (looped.length > 0 && Math.abs((looped[looped.length - 1].t ?? 0) - firstT) < 1e-9) {
-            looped.pop();
-        }
         return [...looped, ...keyframes];
     } else {
-        // Looped keyframes come after original. Remove first looped kf if it matches lastT.
-        if (looped.length > 0 && Math.abs((looped[0].t ?? 0) - lastT) < 1e-9) {
-            looped.shift();
-        }
         return [...keyframes, ...looped];
     }
 }
