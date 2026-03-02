@@ -501,8 +501,9 @@ function normalizeKeyframes(
     // Sort by time
     normalized.sort((a, b) => (a.t ?? 0) - (b.t ?? 0));
 
-    // Expand loop if configured
-    const loop = propAnim.loop;
+    // Expand loop if configured (loop:true is shorthand for default PxLoop)
+    const loopRaw = propAnim.loop;
+    const loop: PxLoop | undefined = loopRaw === true ? {} : loopRaw || undefined;
     if (loop && normalized.length >= 2) {
         return expandLoopKeyframes(propName, normalized, loop, duration);
     }

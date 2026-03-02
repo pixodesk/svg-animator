@@ -119,7 +119,7 @@ export interface PxPropertyAnimation {
 
     /** Optional loop configuration. When set, the keyframe sequence is extended beyond its defined
      *  range by repeating a chosen segment. See {@link PxLoop} for details. */
-    loop?: PxLoop;
+    loop?: PxLoop | boolean;
 }
 
 /**
