@@ -61,6 +61,51 @@ export interface PxKeyframe {
     e?: PxEasingOrRef;
 }
 
+
+/**
+ * Defines how a property's keyframe animation is extended beyond its defined keyframe range
+ * by continuously repeating a chosen segment of the sequence.
+ *
+ * The repeated segment is a contiguous run of keyframe *intervals* (gaps between consecutive
+ * keyframes). Which end of the sequence is repeated is controlled by `before`, and whether
+ * each repetition plays in the same direction or alternates is controlled by `alternate`.
+ */
+export interface PxLoop {
+
+    /**
+     * Number of keyframe intervals (gaps between consecutive keyframes) that form the repeating
+     * segment.
+     *
+     * - `undefined` → the entire keyframe sequence is used as the loop segment.
+     * - `N`         → only the first `N` intervals (when `before: true`) or the last `N` intervals
+     *                 (when `before: false`) are looped. Clamped to `[1, keyframes.length - 1]`.
+     */
+    segmentCount?: number;
+
+    /**
+     * Selects which end of the keyframe sequence is looped.
+     *
+     * - `true`  → the source segment is taken from the *start* of the keyframe sequence.
+     *             The animation is extended *before* the first keyframe — useful for intro loops
+     *             that run before the main timeline begins.
+     *
+     * - `false` (default) → the source segment is taken from the *end* of the keyframe sequence.
+     *             The animation is extended *after* the last keyframe — useful for idle or outro
+     *             loops that continue once the main timeline has finished.
+     */
+    before?: boolean;
+
+    /**
+     * Controls playback direction on each successive loop iteration.
+     *
+     * - `false` (default) → **cycle**: every iteration replays the segment in the same direction.
+     *
+     * - `true`  → **pingpong**: iterations alternate between forward and backward playback
+     *             (even iterations play forward, odd iterations play in reverse).
+     */
+    alternate?: boolean;
+}
+
 /**
  * Animation definition for a single CSS/SVG property.
  * Contains an array of keyframes that define how the property changes over time.
@@ -71,6 +116,10 @@ export interface PxPropertyAnimation {
 
     /** Short alias for "keyframes" */
     kfs?: PxKeyframe[];
+
+    /** Optional loop configuration. When set, the keyframe sequence is extended beyond its defined
+     *  range by repeating a chosen segment. See {@link PxLoop} for details. */
+    loop?: PxLoop;
 }
 
 /**
