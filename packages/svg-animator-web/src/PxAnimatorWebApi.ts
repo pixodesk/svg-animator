@@ -138,26 +138,27 @@ export function createWebApiAnimator(
         // Convert animation definition to Web API keyframes
         const keyframesMap = convertToWebApiKeyframes(animDef, unsupportedSet, config);
 
+
+        // Delay handling:
+        // - Positive delay (e.g., 500): Wait before starting → use `delay` option
+        // - Negative delay (e.g., -500): Start mid-animation → use `currentTime` to seek
+        //   (Web Animations API doesn't reliably support negative delay values)
+        // - Negative delay is wrapped to duration (e.g., -5000 with duration 2000 → seek to 1000)
+        const positiveDelay = config.delay && config.delay > 0 ? config.delay : undefined;
+        const seekPosition = config.delay && config.delay < 0 && config.duration
+            ? (-config.delay) % config.duration
+            : undefined;
+
+        const effectOptions: KeyframeEffectOptions = {
+            duration: config.duration,
+            delay: positiveDelay,
+            fill: config.fill,
+            direction: config.direction,
+            iterations: iterations
+        };
+
         for (let i = 0; i < elements.length; i++) {
             const element = elements[i];
-
-            // Delay handling:
-            // - Positive delay (e.g., 500): Wait before starting → use `delay` option
-            // - Negative delay (e.g., -500): Start mid-animation → use `currentTime` to seek
-            //   (Web Animations API doesn't reliably support negative delay values)
-            // - Negative delay is wrapped to duration (e.g., -5000 with duration 2000 → seek to 1000)
-            const positiveDelay = config.delay && config.delay > 0 ? config.delay : undefined;
-            const seekPosition = config.delay && config.delay < 0 && config.duration
-                ? (-config.delay) % config.duration
-                : undefined;
-
-            const effectOptions: KeyframeEffectOptions = {
-                duration: config.duration,
-                delay: positiveDelay,
-                fill: config.fill,
-                direction: config.direction,
-                iterations: iterations
-            };
 
             for (const [, keyframes] of keyframesMap) {
                 if (keyframes.length > 0) {
@@ -212,7 +213,20 @@ export function createWebApiAnimator(
             callbacks?.onCancel?.(); // FIXME onFinished needs to be called when animation finishes, e.g. from animations, and some flag that it was triggered by user
         },
         "finish": () => {
-            animations.forEach(a => a.finish()); // FIXME onFinished needs to be called when animation finishes, e.g. from animations, not only when you call finish manually
+            for (const a of animations) {
+                try {
+                    if (a.effect?.getTiming().iterations === Infinity) {
+                        a.effect.updateTiming({ iterations: 1 });
+                        a.finish();
+                        a.effect.updateTiming({ iterations: Infinity });
+                    } else {
+                        a.finish();
+                    }
+                } catch (e) {
+                    a.cancel();
+                }
+            }
+            // FIXME onFinished needs to be called when animation finishes, e.g. from animations, not only when you call finish manually
         },
 
         "setPlaybackRate": (rate: number) => {
