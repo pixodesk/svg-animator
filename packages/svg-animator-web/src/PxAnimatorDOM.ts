@@ -9,10 +9,10 @@ import { camelCaseToKebabWordIfNeeded, COLOUR_ATTR_NAMES, toRGBA, TRANSFORM_FN_N
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-
+// textPath
 const ALLOWED_SVG_TAGS_LOWER_CASE = new Set([
     'svg', 'g', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon',
-    'text', 'tspan', 'defs', 'clipPath', 'mask', 'pattern', 'linearGradient',
+    'text', 'tspan', 'textPath', 'defs', 'clipPath', 'mask', 'pattern', 'linearGradient',
     'radialGradient', 'stop', 'use', 'symbol', 'marker', 'filter', 'feGaussianBlur',
     'feOffset', 'feBlend', 'feColorMatrix', 'feMerge', 'feMergeNode'
 ].map(tagName => tagName.toLowerCase()));
@@ -38,7 +38,7 @@ const ALLOWED_RESOURCE_ATTRIBUTES = [
 ];
 const ALLOWED_RESOURCE_ATTRIBUTES_SET = new Set(ALLOWED_RESOURCE_ATTRIBUTES);
 
-const ALLOWED_ATTRIBUTES_SET = new Set([
+const ALLOWED_ATTRIBUTES = [
     'href', 'src',
 
     // Presentation
@@ -47,9 +47,13 @@ const ALLOWED_ATTRIBUTES_SET = new Set([
     // Geometry
     'x', 'y', 'cx', 'cy', 'r', 'rx', 'ry', 'width', 'height', 'd',
     'x1', 'y1', 'x2', 'y2', 'points',
+    'dx', 'dy',
 
     // Text
     'fontSize' /*font-size*/, 'fontFamily' /*font-family*/, 'textAnchor' /*text-anchor*/,
+    'fontWeight', 'fontStyle',
+    'letterSpacing', 'wordSpacing',
+    'space', 'xml:space', 'textDecoration', 'textTransform', 'whiteSpace', 'white-space',
 
     // Structure
     'id', 'class', 'viewBox', 'preserveAspectRatio',
@@ -64,13 +68,14 @@ const ALLOWED_ATTRIBUTES_SET = new Set([
     'filter', 'stdDeviation', 'in', 'in2', 'result', 'mode',
 
     ...ALLOWED_RESOURCE_ATTRIBUTES
-]);
+];
+const ALLOWED_ATTRIBUTES_LOW_SET = new Set(ALLOWED_ATTRIBUTES.map(str => str.toLowerCase()));
 
 function sanitiseAttributeValue(name: string, value: any): any | undefined {
     const nameLower = name.toLowerCase();
 
     // Block dangerous attributes
-    if (!ALLOWED_ATTRIBUTES_SET.has(nameLower)) {
+    if (!ALLOWED_ATTRIBUTES_LOW_SET.has(nameLower)) {
         console.warn('Attribute not in whitelist: ', nameLower);
         return undefined;
     }
@@ -102,8 +107,6 @@ function sanitiseAttributeValue(name: string, value: any): any | undefined {
         return undefined;
     }
 
-    
-
     return value;
 }
 
@@ -114,7 +117,10 @@ function createElement(
     children: Array<Element> | undefined,
     textContent?: string
 ): SVGElement | null {
-    if (!ALLOWED_SVG_TAGS_LOWER_CASE.has(tagName.toLowerCase())) return null;
+    if (!ALLOWED_SVG_TAGS_LOWER_CASE.has(tagName.toLowerCase())) {
+        console.warn('Attribute not in whitelist: ', tagName);
+        return null;
+    }
 
     const element = document.createElementNS(SVG_NS, tagName);
 
