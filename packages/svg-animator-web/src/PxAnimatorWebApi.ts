@@ -83,27 +83,32 @@ function convertToWebApiKeyframes(
             const kf = keyframes[i];
 
             let t = kf.t ?? kf.time ?? 0;
-            t = clamp(t / (config.duration || 1), 0, 1);
+            const rawOffset = t / (config.duration || 1);
 
-            const cssKf: Keyframe = createCssKf(kf, t, propName, unsupportedSet);
+            // Drop keyframes outside [0, duration] range.
+            if (rawOffset >= 0 && rawOffset <= 1) {
+                t = clamp(rawOffset, 0, 1);
 
-            // Keyframes need to start with offset:0 to work correctly with loops
-            if (i === 0 && (cssKf.offset || 0) > 0) {
-                cssKeyframes.push({
-                    ...cssKf,
-                    offset: 0
-                });
+                const cssKf: Keyframe = createCssKf(kf, t, propName, unsupportedSet);
+
+                // Keyframes need to start with offset:0 to work correctly with loops
+                if (i === 0 && (cssKf.offset || 0) > 0) {
+                    cssKeyframes.push({
+                        ...cssKf,
+                        offset: 0
+                    });
+                }
+
+                cssKeyframes.push(cssKf);
             }
+        }
 
-            cssKeyframes.push(cssKf);
-
-            // Keyframes need to end with offset:1 to work correctly with loops
-            if (i === keyframes.length - 1 && (cssKf.offset || 0) < 1) {
-                cssKeyframes.push({
-                    ...cssKf,
-                    offset: 1
-                });
-            }
+        // Keyframes need to end with offset:1 to work correctly with loops
+        if (cssKeyframes.length > 0 && (cssKeyframes[cssKeyframes.length - 1].offset || 0) < 1) {
+            cssKeyframes.push({
+                ...cssKeyframes[cssKeyframes.length - 1],
+                offset: 1
+            });
         }
 
         if (cssKeyframes.length > 0) {
