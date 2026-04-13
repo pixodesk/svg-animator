@@ -197,7 +197,11 @@ export function createWebApiAnimator(
         const effectOptions: KeyframeEffectOptions = {
             duration: config.duration,
             delay: positiveDelay,
-            fill: config.fill,
+            // Default to 'forwards' so elements hold their final state after the
+            // animation ends — consistent with Lottie and other animation runtimes.
+            // Without this, seeking to the last frame reverts elements to their
+            // pre-animation state (the Web Animations API "after" phase with fill:'none').
+            fill: config.fill ?? 'forwards',
             direction: config.direction,
             iterations: iterations
         };

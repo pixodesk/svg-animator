@@ -167,7 +167,14 @@ export interface PxAnimatorConfig {
     /** Number of times to repeat the animation. Use "infinite" for endless loop. */
     iterations?: number | "infinite";
 
-    /** Defines which values are applied before/after the animation */
+    /**
+     * Defines which values are applied before/after the active animation period
+     * (maps directly to the Web Animations API `fill` option).
+     * Defaults to `'forwards'` when not set so that elements hold their final
+     * state after the animation ends — consistent with Lottie and other animation
+     * runtimes. Without this default, seeking to the last frame would cause
+     * elements to revert to their pre-animation state.
+     */
     fill?: FillMode;
 
     /** Direction of animation playback */
