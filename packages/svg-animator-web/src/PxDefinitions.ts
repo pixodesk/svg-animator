@@ -294,7 +294,7 @@ function resolveElementAnimation(
  * Interpolates between two keyframe values based on property type.
  * Returns the raw interpolated value (not a CSS string).
  */
-function interpolateValue(propName: string, a: any, b: any, t: number): any {
+export function interpolateValue(propName: string, a: any, b: any, t: number): any {
     if (propName === 'd') {
         const aPaths = a?.paths ?? (Array.isArray(a) ? a : []);
         const bPaths = b?.paths ?? (Array.isArray(b) ? b : []);

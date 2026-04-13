@@ -6,8 +6,8 @@
 import { getSelector } from './PxAnimatorFrameLoop';
 import { setupAnimationTriggers } from './PxAnimatorTriggers';
 import { getAnimatorConfig, PxAnimatedSvgDocument, PxAnimatorConfig, PxKeyframe, type PxAnimationDefinition, type PxAnimatorAPI, type PxAnimatorCallbacksConfig } from './PxAnimatorTypes';
-import { clamp, COLOUR_ATTR_NAMES, kebabToCamelCaseWord, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
-import { getNormalisedBindings } from './PxDefinitions';
+import { clamp, COLOUR_ATTR_NAMES, cubicBezier, kebabToCamelCaseWord, splitEasing, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
+import { getNormalisedBindings, interpolateValue } from './PxDefinitions';
 
 
 /**
@@ -57,13 +57,64 @@ function createCssKf(kf: PxKeyframe, t: number, propName: string, unsupportedSet
 }
 
 /**
+ * Clips keyframes to the [0, duration] range.
+ * If a keyframe pair straddles a boundary (t=0 or t=duration), inserts an interpolated
+ * keyframe at the boundary with the correct value and split easing, so WAAPI sees
+ * exact start/end values rather than out-of-range ones.
+ */
+function clipKeyframesToDuration(
+    propName: string,
+    keyframes: PxKeyframe[],
+    duration: number
+): PxKeyframe[] {
+    const result: PxKeyframe[] = [];
+
+    for (let i = 0; i < keyframes.length; i++) {
+        const kf = keyframes[i];
+        const t = kf.t ?? 0;
+
+        if (t < 0) {
+            // If the next keyframe is in range, interpolate value at t=0
+            const next = keyframes[i + 1];
+            if (next && (next.t ?? 0) >= 0) {
+                const nextT = next.t ?? 0;
+                const localFrac = (0 - t) / (nextT - t);
+                const easedFrac = kf.e ? cubicBezier(kf.e as [number, number, number, number])(localFrac) : localFrac;
+                const { right: rightEasing } = splitEasing(kf.e as any, localFrac);
+                result.push({ t: 0, v: interpolateValue(propName, kf.v, next.v, easedFrac), e: rightEasing });
+            }
+            continue;
+        }
+
+        if (t > duration) {
+            // If the previous keyframe was in range, interpolate value at t=duration
+            const prev = keyframes[i - 1];
+            if (prev && (prev.t ?? 0) <= duration) {
+                const prevT = prev.t ?? 0;
+                const localFrac = (duration - prevT) / (t - prevT);
+                const easedFrac = prev.e ? cubicBezier(prev.e as [number, number, number, number])(localFrac) : localFrac;
+                const { left: leftEasing } = splitEasing(prev.e as any, localFrac);
+                if (result.length > 0) result[result.length - 1] = { ...result[result.length - 1], e: leftEasing };
+                result.push({ t: duration, v: interpolateValue(propName, prev.v, kf.v, easedFrac), e: undefined });
+            }
+            break;
+        }
+
+        result.push(kf);
+    }
+
+    return result;
+}
+
+/**
  * Converts a PxAnimationDefinition into a map of Web Animations API Keyframe arrays, one per
  * animated property.
  *
  * For each property in the definition the function:
- * 1. Normalises keyframe time values to the [0, 1] offset range (time / duration).
- * 2. Delegates CSS value conversion to createCssKf.
- * 3. Ensures the keyframe sequence always starts at offset: 0 and ends at offset: 1 — a
+ * 1. Clips keyframes to [0, duration], interpolating boundary values when a pair straddles an edge.
+ * 2. Normalises keyframe time values to the [0, 1] offset range (time / duration).
+ * 3. Delegates CSS value conversion to createCssKf.
+ * 4. Ensures the keyframe sequence always starts at offset: 0 and ends at offset: 1 — a
  *    requirement of the Web Animations API for correct looping behaviour. If the first keyframe
  *    starts after 0 or the last keyframe ends before 1, a copy of that keyframe is inserted at the
  *    boundary with the adjusted offset.
@@ -76,31 +127,22 @@ function convertToWebApiKeyframes(
     const result = new Map<string, Keyframe[]>();
 
     for (const [propName, propAnim] of Object.entries(animDef)) {
-        const keyframes = propAnim.kfs || propAnim.keyframes || [];
+        const duration = config.duration || 1;
+        const clippedKeyframes = clipKeyframesToDuration(propName, propAnim.kfs || propAnim.keyframes || [], duration);
         const cssKeyframes: Keyframe[] = [];
 
-        for (let i = 0; i < keyframes.length; i++) {
-            const kf = keyframes[i];
+        for (let i = 0; i < clippedKeyframes.length; i++) {
+            const kf = clippedKeyframes[i];
 
-            let t = kf.t ?? kf.time ?? 0;
-            const rawOffset = t / (config.duration || 1);
+            const t = clamp((kf.t ?? 0) / duration, 0, 1);
+            const cssKf: Keyframe = createCssKf(kf, t, propName, unsupportedSet);
 
-            // Drop keyframes outside [0, duration] range.
-            if (rawOffset >= 0 && rawOffset <= 1) {
-                t = clamp(rawOffset, 0, 1);
-
-                const cssKf: Keyframe = createCssKf(kf, t, propName, unsupportedSet);
-
-                // Keyframes need to start with offset:0 to work correctly with loops
-                if (i === 0 && (cssKf.offset || 0) > 0) {
-                    cssKeyframes.push({
-                        ...cssKf,
-                        offset: 0
-                    });
-                }
-
-                cssKeyframes.push(cssKf);
+            // Keyframes need to start with offset:0 to work correctly with loops
+            if (i === 0 && (cssKf.offset || 0) > 0) {
+                cssKeyframes.push({ ...cssKf, offset: 0 });
             }
+
+            cssKeyframes.push(cssKf);
         }
 
         // Keyframes need to end with offset:1 to work correctly with loops
