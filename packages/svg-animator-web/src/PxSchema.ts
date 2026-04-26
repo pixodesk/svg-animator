@@ -29,17 +29,18 @@
 // Public interface
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface PxSchema<T> {
+export interface PxSchema<T, IsOptional extends boolean = false> {
     sanitize(raw: unknown): T;
     isValid(raw: unknown): boolean;
     /** True if raw has the right structure to attempt sanitization (may still need repair). */
     _canSanitize(raw: unknown): boolean;
     readonly _default: T;
-    optional(): PxSchema<T | undefined>;
+    /** Returns a new schema that marks this field as optional (?: in object shapes). */
+    optional(): PxSchema<T | undefined, true>;
 }
 
 /** Extract the TypeScript type from a schema. */
-export type PxInfer<S> = S extends PxSchema<infer T> ? T : never;
+export type PxInfer<S> = S extends PxSchema<infer T, any> ? T : never;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,14 +48,14 @@ export type PxInfer<S> = S extends PxSchema<infer T> ? T : never;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Shared base; overrides _canSanitize only when the structural check must differ from isValid. */
-abstract class Base<T> implements PxSchema<T> {
+abstract class Base<T, IsOptional extends boolean = false> implements PxSchema<T, IsOptional> {
     abstract sanitize(raw: unknown): T;
     abstract isValid(raw: unknown): boolean;
     abstract readonly _default: T;
 
     _canSanitize(raw: unknown): boolean { return this.isValid(raw); }
 
-    optional(): PxSchema<T | undefined> { return new Optional(this); }
+    optional(): PxSchema<T | undefined, true> { return new Optional(this); }
 }
 
 
@@ -68,9 +69,9 @@ abstract class Base<T> implements PxSchema<T> {
  * Wraps any schema to make its value optional.
  * sanitize uses _canSanitize (not isValid) so partially-valid objects are repaired, not dropped.
  */
-class Optional<T> extends Base<T | undefined> {
+class Optional<T> extends Base<T | undefined, true> {
     readonly _default = undefined as T | undefined;
-    constructor(private readonly inner: PxSchema<T>) { super(); }
+    constructor(private readonly inner: PxSchema<T, any>) { super(); }
 
     sanitize(raw: unknown): T | undefined {
         if (raw === undefined || raw === null) return undefined;
@@ -167,8 +168,8 @@ class Union<T> extends Base<T> {
 }
 
 // Infers the union of all member types from a tuple of schemas
-type UnionMembers<T extends ReadonlyArray<PxSchema<any>>> =
-    T extends ReadonlyArray<PxSchema<infer U>> ? U : never;
+type UnionMembers<T extends ReadonlyArray<PxSchema<any, any>>> =
+    T extends ReadonlyArray<PxSchema<infer U, any>> ? U : never;
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,8 +177,13 @@ type UnionMembers<T extends ReadonlyArray<PxSchema<any>>> =
 // _canSanitize: true when raw is a plain (non-array) object
 // ─────────────────────────────────────────────────────────────────────────────
 
-type AnyShape = Record<string, PxSchema<any>>;
-type InferShape<S extends AnyShape> = { [K in keyof S]: PxInfer<S[K]> };
+type AnyShape = Record<string, PxSchema<any, any>>;
+
+// Required keys: IsOptional=false → plain property.
+// Optional keys: IsOptional=true  → ?:, with Exclude<T,undefined> (?: already adds undefined).
+type InferShape<S extends AnyShape> =
+    { [K in keyof S as S[K] extends PxSchema<any, true> ? never : K]: PxInfer<S[K]> } &
+    { [K in keyof S as S[K] extends PxSchema<any, true> ? K : never]?: Exclude<PxInfer<S[K]>, undefined> };
 
 /**
  * Typed object schema; strips unknown keys, repairs required fields via their defaults.
@@ -331,7 +337,7 @@ export const px = {
      * Returns the first schema whose isValid passes.
      * TypeScript infers the union of all member types automatically.
      */
-    union: <T extends ReadonlyArray<PxSchema<any>>>(
+    union: <T extends ReadonlyArray<PxSchema<any, any>>>(
         schemas: T,
         defaultVal?: UnionMembers<T>
     ): PxSchema<UnionMembers<T>> =>
