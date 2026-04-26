@@ -291,7 +291,7 @@ const PixodeskSvgAnimator = defineComponent({
             destroyApi();
             const doc = resolvedDoc.value;
             if (!doc) return;
-            apiRef.value = createAnimator(doc, createVueAdapter(elementRefs));
+            apiRef.value = createAnimator({ data: doc, adapter: createVueAdapter(elementRefs) });
         }
 
         function destroyApi() {

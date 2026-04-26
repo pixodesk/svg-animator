@@ -241,7 +241,7 @@ const PixodeskSvgAnimatorImpl: FC<PixodeskSvgAnimatorImplProps> = ({
     // Create the animator once per document and tear it down on unmount.
     useEffect(() => {
 
-        let api: PxAnimatorAPI | undefined = createAnimator(doc, createReactAdapter(elementRefs));
+        let api: PxAnimatorAPI | undefined = createAnimator({ data: doc, adapter: createReactAdapter(elementRefs) });
         apiHolderRef.current = api;
 
         return () => {

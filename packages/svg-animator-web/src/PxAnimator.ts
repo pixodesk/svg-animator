@@ -256,32 +256,50 @@ export function createAnimatorImpl(
     return createAnimatorFromConfig(doc, adapter, callbacks, rootElement);
 }
 
+export const PX_ANIMATOR_DATA_KEY = 'data';
+
+export interface PxAnimatorOptions {
+    /** URL to fetch the animation document from. Provide either this or `data`, not both. */
+    src?: string;
+    /** Inline animation document object. Provide either this or `src`, not both. */
+    data?: PxAnimatedSvgDocument;
+    /** Platform adapter for frame-loop rendering. */
+    adapter?: PxPlatformAdapter;
+    /** Callback functions for animation lifecycle events. */
+    callbacks?: PxAnimatorCallbacksConfig;
+    /** CSS selector or element to render the SVG into. */
+    container?: string | Element;
+}
+
 /**
  * Creates an animator instance to control SVG animations.
- * Accepts either a document object or a URL to fetch.
  *
- * @param docOrUrl The animated SVG document or URL to fetch it from.
- * @param callbacks Optional object with callback functions for animation lifecycle events.
- * @param containerElement Optional selector or element to render the SVG into.
- * @returns An PxAnimatorAPI instance to programmatically control the animation.
+ * @param options.src URL to fetch the animation document from.
+ * @param options.data Inline animation document object.
+ * @param options.container CSS selector or element to render the SVG into.
+ * @returns A PxAnimatorAPI instance to programmatically control the animation.
  */
-export function createAnimator(
-    docOrUrl: PxAnimatedSvgDocument | string,
-    adapter?: PxPlatformAdapter,
-    callbacks?: PxAnimatorCallbacksConfig,
-    containerElement?: string | Element
-): PxAnimatorAPI {
+export function createAnimator(options: PxAnimatorOptions): PxAnimatorAPI {
 
-    if (typeof docOrUrl === 'object') {
-        return createAnimatorImpl(docOrUrl, adapter, callbacks, containerElement);
+    const { src, data, adapter, callbacks, container } = options;
+
+    if (data !== undefined && src !== undefined) {
+        throw new Error('createAnimator: provide either `src` or `data`, not both');
+    }
+    if (data === undefined && src === undefined) {
+        throw new Error('createAnimator: either `src` or `data` is required');
+    }
+
+    if (data !== undefined) {
+        return createAnimatorImpl(data, adapter, callbacks, container);
     }
 
     // URL provided - fetch and create animator
     let animator: PxAnimatorAPI | null = null;
 
-    fetch(docOrUrl).then(res => res.json()).then(json => {
+    fetch(src!).then(res => res.json()).then(json => {
         if (isPxElementFileFormat(json)) {
-            animator = createAnimatorImpl(json, adapter, callbacks, containerElement);
+            animator = createAnimatorImpl(json, adapter, callbacks, container);
         } else {
             console.error('Invalid animation document format');
         }
@@ -314,7 +332,7 @@ export function loadTagAnimators() {
         if (!(element as any)[PX_ANIM_ATTR_NAME]) {
             const src = element.getAttribute(PX_ANIM_SRC_ATTR_NAME);
             if (src) {
-                (element as any)[PX_ANIM_ATTR_NAME] = createAnimator(src, undefined, undefined, element);
+                (element as any)[PX_ANIM_ATTR_NAME] = createAnimator({ src, container: element });
             }
         }
     }

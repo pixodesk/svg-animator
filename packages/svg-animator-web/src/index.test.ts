@@ -22,7 +22,7 @@ describe('animateBackground', () => {
 
     it('Simple test', async () => {
 
-        createAnimator(getTestJson(), undefined, undefined, '#svg-container');
+        createAnimator({ data: getTestJson(), container: '#svg-container' });
 
         const svg = document.querySelector('svg');
         expect(svg).not.toBeNull();
@@ -46,7 +46,7 @@ describe('animateBackground', () => {
         // Add loop:true to the translate property
         json.bindings![0].animate!['translate'].loop = true;
 
-        createAnimator(json, undefined, undefined, '#svg-container');
+        createAnimator({ data: json, container: '#svg-container' });
 
         const ellipse = document.querySelector('ellipse');
         expect(ellipse).not.toBeNull();
@@ -71,12 +71,15 @@ describe('animateBackground', () => {
     it('Remove <script> tag', async () => {
 
         createAnimator({
-            type: 'svg',
-            children: [
-                { type: 'ellipse', fill: '#0087ff' },
-                { type: 'script', textContent: 'alert("hi");' }
-            ]
-        }, undefined, undefined, '#svg-container');
+            data: {
+                type: 'svg',
+                children: [
+                    { type: 'ellipse', fill: '#0087ff' },
+                    { type: 'script', textContent: 'alert("hi");' }
+                ]
+            },
+            container: '#svg-container'
+        });
 
         const svg = document.querySelector('svg');
         expect(svg).not.toBeNull();

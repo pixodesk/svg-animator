@@ -3,7 +3,8 @@
  * Licensed under the MIT License. See the LICENSE file in the project root for details.
  *---------------------------------------------------------------------------------------*/
 
-export { createAnimator, createAnimatorImpl, generateNewIds, loadTagAnimators } from './PxAnimator';
+export { createAnimator, createAnimatorImpl, generateNewIds, loadTagAnimators, PX_ANIMATOR_DATA_KEY } from './PxAnimator';
+export type { PxAnimatorOptions } from './PxAnimator';
 
 // Types
 export type {
