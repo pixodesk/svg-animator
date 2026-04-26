@@ -4,6 +4,9 @@
  *---------------------------------------------------------------------------------------*/
 
 export { createAnimator, createAnimatorImpl, generateNewIds, loadTagAnimators, PX_ANIMATOR_DATA_KEY } from './PxAnimator';
+
+export { px } from './PxSchema';
+export type { PxInfer, PxSchema } from './PxSchema';
 export type { PxAnimatorOptions } from './PxAnimator';
 
 // Types
