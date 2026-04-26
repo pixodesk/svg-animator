@@ -7,6 +7,7 @@ import {
     PxAnimatedSvgDocumentSchema,
     PxAnimationDefinitionSchema,
     PxAnimatorConfigSchema,
+    PxBezierPathSchema,
     PxBindingSchema,
     PxDefsSchema,
     PxEasingOrRefSchema,
@@ -212,20 +213,7 @@ export interface PxAnimatorCallbacksConfig {
 export type PxPoint2D = Array<number>;
 
 /** Represents a vector path for SVG shape animations. */
-export interface PxBezierPath {
-
-    /** An array of vertex points [[x, y], ...]. */
-    v: Array<PxPoint2D>;
-
-    /** An array of 'in' tangent handles for each vertex [[x, y], ...]. */
-    i?: Array<PxPoint2D>;
-
-    /** An array of 'out' tangent handles for each vertex [[x, y], ...]. */
-    o?: Array<PxPoint2D>;
-
-    /** A boolean indicating if the path is closed. */
-    c?: boolean;
-}
+export type PxBezierPath = PxInfer<typeof PxBezierPathSchema>;
 
 /** Basic animation controls common to all animator types. */
 export interface PxBasicAnimatorAPI {

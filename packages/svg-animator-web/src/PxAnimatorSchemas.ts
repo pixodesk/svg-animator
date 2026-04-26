@@ -64,10 +64,17 @@ export const PxDefsSchema = px.object({
     styles:     px.record(px.any()).optional(),
 });
 
+export const PxBezierPathSchema = px.object({
+    v: px.array(px.array(px.number())),
+    i: px.array(px.array(px.number())).optional(),
+    o: px.array(px.array(px.number())).optional(),
+    c: px.boolean().optional(),
+});
+
 // `let` so the lazy closure can capture the variable reference after assignment.
 // By the time the lazy resolves (first isValid/sanitize call), PxNodeSchema is assigned.
 // eslint-disable-next-line prefer-const
-let PxNodeSchema: PxSchema<any> = px.object({
+let PxNodeSchema: PxSchema<any> = px.openObject({
     type:     px.string(),
     children: px.lazy(() => px.array(PxNodeSchema), []).optional(),
     animate:  PxElementAnimationSchema.optional(),

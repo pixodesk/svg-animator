@@ -228,6 +228,57 @@ class Obj<S extends AnyShape> extends Base<InferShape<S>> {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// OpenObj — like Obj but passes unknown keys through unchanged.
+// Known keys are validated/sanitized; extra keys are kept as-is.
+// Inferred type: InferShape<S> & { [key: string]: any }.
+// Note: TypeScript intersection semantics mean named-property access on the
+// derived type yields `any` rather than the specific declared type. For
+// type-precise access keep a hand-written interface alongside the schema.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type InferOpenShape<S extends AnyShape> = InferShape<S> & { [key: string]: any };
+
+/**
+ * Open object schema; validates/repairs known keys, passes unknown keys through unchanged.
+ * Use when the object may carry arbitrary extra properties (e.g. SVG element attributes).
+ */
+class OpenObj<S extends AnyShape> extends Base<InferOpenShape<S>> {
+    readonly _default: InferOpenShape<S>;
+
+    constructor(private readonly shape: S) {
+        super();
+        const d: any = {};
+        for (const key of Object.keys(shape)) d[key] = shape[key]._default;
+        this._default = d;
+    }
+
+    sanitize(raw: unknown): InferOpenShape<S> {
+        const src: Record<string, unknown> = (raw && typeof raw === 'object' && !Array.isArray(raw))
+            ? raw as Record<string, unknown>
+            : {};
+        const out: Record<string, unknown> = { ...src };
+        for (const key of Object.keys(this.shape)) {
+            out[key] = this.shape[key].sanitize(src[key]);
+        }
+        return out as InferOpenShape<S>;
+    }
+
+    isValid(raw: unknown): boolean {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+        const obj = raw as any;
+        for (const key of Object.keys(this.shape)) {
+            if (!this.shape[key].isValid(obj[key])) return false;
+        }
+        return true;
+    }
+
+    override _canSanitize(raw: unknown): boolean {
+        return !!raw && typeof raw === 'object' && !Array.isArray(raw);
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Array — items that cannot be attempted are filtered out; default is []
 // Uses _canSanitize for filtering so partially-valid objects are repaired, not dropped.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -387,6 +438,10 @@ export const px = {
     /** Typed object — unknown keys are stripped. Required fields fall back to their default. */
     object: <S extends AnyShape>(shape: S): PxSchema<InferShape<S>> =>
         new Obj(shape),
+
+    /** Open object — validates known keys, passes unknown keys through unchanged. */
+    openObject: <S extends AnyShape>(shape: S): PxSchema<InferOpenShape<S>> =>
+        new OpenObj(shape),
 
     /** Array whose unrecoverable items are filtered out. Default: []. */
     array: <T>(item: PxSchema<T>): PxSchema<Array<T>> =>
