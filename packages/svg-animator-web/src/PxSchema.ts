@@ -516,9 +516,14 @@ class Tuple<T extends ReadonlyArray<PxSchema<any, any>>> extends Base<TupleItems
 
 /**
  * Returns a pass-through wrapper that enforces at compile time that the schema's
- * inferred type extends `T`. Place the interface definition before the schema and
- * wrap the schema with this call — TypeScript will error at the schema declaration
- * if the two ever diverge.
+ * inferred type is structurally assignable to `T`. Catches type mismatches on
+ * required fields and value-type mismatches on optional fields.
+ *
+ * For key-level equality (catching optional field renames), pair with a
+ * `KeysMatch` assertion after the inferred type alias:
+ * ```ts
+ * const _ck: KeysMatch<PxFoo, _PxFoo> = true;
+ * ```
  *
  * @example
  * export const PxLoopSchema = implementsInterface<_PxLoop>()(px.object({ ... }));
@@ -526,6 +531,18 @@ class Tuple<T extends ReadonlyArray<PxSchema<any, any>>> extends Base<TupleItems
 export function implementsInterface<T>() {
     return <S extends PxSchema<T>>(schema: S): S => schema;
 }
+
+/**
+ * Evaluates to `true` when A and B have exactly the same set of keys; `false` otherwise.
+ * Use with a `const` assertion to get a compile-time error on key renames:
+ * ```ts
+ * const _ck: KeysMatch<PxFoo, _PxFoo> = true;
+ * ```
+ */
+export type KeysMatch<A, B> =
+    [Exclude<keyof A, keyof B>] extends [never]
+        ? [Exclude<keyof B, keyof A>] extends [never] ? true : false
+        : false;
 
 
 // ─────────────────────────────────────────────────────────────────────────────

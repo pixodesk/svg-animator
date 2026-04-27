@@ -3,8 +3,8 @@
  * Licensed under the MIT License. See the LICENSE file in the project root for details.
  *---------------------------------------------------------------------------------------*/
 
-import { px, implementsInterface } from './PxSchema';
-import type { PxInfer, PxSchema } from './PxSchema';
+import type { KeysMatch, PxInfer, PxSchema } from './PxSchema';
+import { implementsInterface, px } from './PxSchema';
 
 export type FillMode = 'forwards' | 'backwards' | 'both' | 'none';
 
@@ -66,38 +66,39 @@ export type PxEasingOrRef = PxInfer<typeof PxEasingOrRefSchema>;
  * Supports both full property names and short aliases for compact notation.
  */
 export interface _PxKeyframe {
-    
+
     /** Timestamp in milliseconds from animation start */
     time?: number;
-    
+
     /** Short alias for "time" */
     t?: number;
-    
+
     /** The value of the animated property at this keyframe */
     value?: any;
-    
+
     /** Short alias for "value" */
     v?: any;
-    
+
     /** Easing function applied to the interval leading into this keyframe */
     easing?: PxEasingOrRef;
-    
+
     /** Short alias for "easing" */
     e?: PxEasingOrRef;
 }
 
 // `{ time?:number, t?:number, value?:any, v?:any, easing?:Easing, e?:Easing }`
 export const PxKeyframeSchema = implementsInterface<_PxKeyframe>()(px.object({
-    time:   px.number().optional(),
-    t:      px.number().optional(),
-    value:  px.any().optional(),
-    v:      px.any().optional(),
+    time: px.number().optional(),
+    t: px.number().optional(),
+    value: px.any().optional(),
+    v: px.any().optional(),
     easing: PxEasingOrRefSchema.optional(),
-    e:      PxEasingOrRefSchema.optional(),
+    e: PxEasingOrRefSchema.optional(),
 }));
 
 /** A single animation keyframe defining the state at a specific point in time. */
 export type PxKeyframe = PxInfer<typeof PxKeyframeSchema>;
+const _ck_PxKeyframe: KeysMatch<PxKeyframe, _PxKeyframe> = true; // the key sets are identical
 
 
 // ============================================================================
@@ -113,6 +114,7 @@ export type PxKeyframe = PxInfer<typeof PxKeyframeSchema>;
  * each repetition plays in the same direction or alternates is controlled by `alternate`.
  */
 export interface _PxLoop {
+
     /**
      * Number of keyframe intervals (gaps between consecutive keyframes) that form the repeating
      * segment.
@@ -150,8 +152,8 @@ export interface _PxLoop {
 // `{ segmentCount?:number, before?:boolean, alternate?:boolean }`
 export const PxLoopSchema = implementsInterface<_PxLoop>()(px.object({
     segmentCount: px.number().optional(),
-    before:       px.boolean().optional(),
-    alternate:    px.boolean().optional(),
+    before: px.boolean().optional(),
+    alternate: px.boolean().optional(),
 }));
 
 /**
@@ -159,6 +161,7 @@ export const PxLoopSchema = implementsInterface<_PxLoop>()(px.object({
  * by continuously repeating a chosen segment of the sequence.
  */
 export type PxLoop = PxInfer<typeof PxLoopSchema>;
+const _ck_PxLoop: KeysMatch<PxLoop, _PxLoop> = true; // the key sets are identical
 
 
 // ============================================================================
@@ -170,10 +173,13 @@ export type PxLoop = PxInfer<typeof PxLoopSchema>;
  * Contains an array of keyframes that define how the property changes over time.
  */
 export interface _PxPropertyAnimation {
+
     /** Array of keyframes defining the animation timeline */
     keyframes?: PxKeyframe[];
+
     /** Short alias for "keyframes" */
     kfs?: PxKeyframe[];
+
     /** Optional loop configuration. When set, the keyframe sequence is extended beyond its defined
      *  range by repeating a chosen segment. See {@link PxLoop} for details. */
     loop?: PxLoop | boolean;
@@ -182,12 +188,13 @@ export interface _PxPropertyAnimation {
 // `{ keyframes?:Keyframe[], kfs?:Keyframe[], loop?:Loop|boolean }`
 export const PxPropertyAnimationSchema = implementsInterface<_PxPropertyAnimation>()(px.object({
     keyframes: px.array(PxKeyframeSchema).optional(),
-    kfs:       px.array(PxKeyframeSchema).optional(),
-    loop:      px.union([PxLoopSchema, px.boolean()]).optional(),
+    kfs: px.array(PxKeyframeSchema).optional(),
+    loop: px.union([PxLoopSchema, px.boolean()]).optional(),
 }));
 
 /** Animation definition for a single CSS/SVG property. */
 export type PxPropertyAnimation = PxInfer<typeof PxPropertyAnimationSchema>;
+const _ck_PxPropertyAnimation: KeysMatch<PxPropertyAnimation, _PxPropertyAnimation> = true; // the key sets are identical
 
 
 // ============================================================================
@@ -264,23 +271,27 @@ type StartOnExtra = StartOn | 'programmatic';
  * Defines when and how an animation should be triggered.
  */
 export interface _PxTrigger {
+
     /** Event that starts the animation */
     startOn?: StartOnExtra;
+
     /** Action to take when the trigger condition is no longer met (e.g., mouse leaves) */
     outAction?: 'continue' | 'pause' | 'reset' | 'reverse';
+
     /** Percentage of element visibility required to trigger (0–1). Only applies to scrollIntoView. */
     scrollIntoViewThreshold?: number;
 }
 
 // `{ startOn?:'load'|'mouseOver'|'click'|'scrollIntoView'|'programmatic', outAction?:..., scrollIntoViewThreshold?:number }`
 export const PxTriggerSchema = implementsInterface<_PxTrigger>()(px.object({
-    startOn:                 px.enum(['load', 'mouseOver', 'click', 'scrollIntoView', 'programmatic'] as const).optional(),
-    outAction:               px.enum(['continue', 'pause', 'reset', 'reverse'] as const).optional(),
+    startOn: px.enum(['load', 'mouseOver', 'click', 'scrollIntoView', 'programmatic'] as const).optional(),
+    outAction: px.enum(['continue', 'pause', 'reset', 'reverse'] as const).optional(),
     scrollIntoViewThreshold: px.number().optional(),
 }));
 
 /** Defines when and how an animation should be triggered. */
 export type PxTrigger = PxInfer<typeof PxTriggerSchema>;
+const _ck_PxTrigger: KeysMatch<PxTrigger, _PxTrigger> = true; // the key sets are identical
 
 
 // ============================================================================
@@ -292,14 +303,19 @@ export type PxTrigger = PxInfer<typeof PxTriggerSchema>;
  * Defines timing, playback behaviour, and rendering strategy.
  */
 export interface _PxAnimatorConfig {
+
     /** JavaScript animation implementation strategy */
     mode?: JsMode;
+
     /** Total animation duration in milliseconds */
     duration?: number;
+
     /** Delay before animation starts in milliseconds */
     delay?: number;
+
     /** Number of times to repeat the animation. Use "infinite" for endless loop. */
     iterations?: number | "infinite";
+
     /**
      * Defines which values are applied before/after the active animation period
      * (maps directly to the Web Animations API `fill` option).
@@ -309,27 +325,32 @@ export interface _PxAnimatorConfig {
      * elements to revert to their pre-animation state.
      */
     fill?: FillMode;
+
     /** Direction of animation playback */
     direction?: PlaybackDirection;
+
     /** Target frame rate for frame-based animations (only applicable when mode="frames") */
     frameRate?: number;
+
     /** Trigger configuration for when animation should start */
     trigger?: PxTrigger;
+
     debug?: boolean;         // FIXME - implement
+
     debugInstName?: string;  // FIXME - implement
 }
 
 // `{ mode?, duration?, delay?, iterations?, fill?, direction?, frameRate?, trigger?, debug?, debugInstName? }`
 export const PxAnimatorConfigSchema = implementsInterface<_PxAnimatorConfig>()(px.object({
-    mode:          px.enum(['auto', 'webapi', 'frames'] as const).optional(),
-    duration:      px.number().optional(),
-    delay:         px.number().optional(),
-    iterations:    px.union([px.number(), px.literal('infinite')]).optional(),
-    fill:          px.enum(['forwards', 'backwards', 'both', 'none'] as const).optional(),
-    direction:     px.enum(['normal', 'reverse', 'alternate', 'alternate-reverse'] as const).optional(),
-    frameRate:     px.number().optional(),
-    trigger:       PxTriggerSchema.optional(),
-    debug:         px.boolean().optional(),
+    mode: px.enum(['auto', 'webapi', 'frames'] as const).optional(),
+    duration: px.number().optional(),
+    delay: px.number().optional(),
+    iterations: px.union([px.number(), px.literal('infinite')]).optional(),
+    fill: px.enum(['forwards', 'backwards', 'both', 'none'] as const).optional(),
+    direction: px.enum(['normal', 'reverse', 'alternate', 'alternate-reverse'] as const).optional(),
+    frameRate: px.number().optional(),
+    trigger: PxTriggerSchema.optional(),
+    debug: px.boolean().optional(),
     debugInstName: px.string().optional(),
 }));
 
@@ -338,6 +359,7 @@ export const PxAnimatorConfigSchema = implementsInterface<_PxAnimatorConfig>()(p
  * Defines timing, playback behavior, and rendering strategy.
  */
 export type PxAnimatorConfig = PxInfer<typeof PxAnimatorConfigSchema>;
+const _ck_PxAnimatorConfig: KeysMatch<PxAnimatorConfig, _PxAnimatorConfig> = true; // the key sets are identical
 
 
 // ============================================================================
@@ -349,10 +371,13 @@ export type PxAnimatorConfig = PxInfer<typeof PxAnimatorConfigSchema>;
  * Defined once here, referenced by name on elements.
  */
 export interface _PxDefs {
+
     /** Named cubic-bezier easing functions */
     easings?: { [name: string]: [number, number, number, number]; };
+
     /** Named animation definitions that can be referenced by elements */
     animations?: { [name: string]: PxAnimationDefinition; };
+
     /**
      * FIXME - do we need it?
      * Named style presets for common styling patterns
@@ -362,13 +387,14 @@ export interface _PxDefs {
 
 // `{ easings?:Record<name,[x1,y1,x2,y2]>, animations?:Record<name,AnimationDefinition>, styles?:Record<string,any> }`
 export const PxDefsSchema = implementsInterface<_PxDefs>()(px.object({
-    easings:    px.record(px.tuple([px.number(), px.number(), px.number(), px.number()] as const)).optional(),
+    easings: px.record(px.tuple([px.number(), px.number(), px.number(), px.number()] as const)).optional(),
     animations: px.record(PxAnimationDefinitionSchema).optional(),
-    styles:     px.record(px.any()).optional(),
+    styles: px.record(px.any()).optional(),
 }));
 
 /** Reusable definitions library for easings, animations, and styles. */
 export type PxDefs = PxInfer<typeof PxDefsSchema>;
+const _ck_PxDefs: KeysMatch<PxDefs, _PxDefs> = true; // the key sets are identical
 
 
 // ============================================================================
@@ -380,15 +406,17 @@ export type PxDefs = PxInfer<typeof PxDefsSchema>;
  * Used when the SVG tree is pre-rendered and animations are applied separately.
  */
 export interface _PxBinding {
+
     /** ID targeting elements in the DOM (data-px-id="...") */
     id: string;
+
     /** Animation to apply to matched elements */
     animate: PxElementAnimation;
 }
 
 // `{ id:string, animate:ElementAnimation }`
 export const PxBindingSchema = implementsInterface<_PxBinding>()(px.object({
-    id:      px.string(),
+    id: px.string(),
     animate: PxElementAnimationSchema,
 }));
 
@@ -397,6 +425,7 @@ export const PxBindingSchema = implementsInterface<_PxBinding>()(px.object({
  * Used when the SVG tree is pre-rendered and animations are applied separately.
  */
 export type PxBinding = PxInfer<typeof PxBindingSchema>;
+const _ck_PxBinding: KeysMatch<PxBinding, _PxBinding> = true; // the key sets are identical
 
 
 // ============================================================================
@@ -408,17 +437,22 @@ export type PxBinding = PxInfer<typeof PxBindingSchema>;
  * Named properties take precedence over the index signature when accessed.
  */
 export interface _PxNode {
+
     /** SVG element type (e.g., "circle", "rect", "path", "g") */
     type: string;
+
     /** Child elements (for container elements like <g>) */
     children?: PxNode[];
+
     /** Animation applied to this element */
     animate?: PxElementAnimation;
+
     /**
      * FIXME - do we need it?
      * Style applied to this element (named reference or inline object)
      */
     style?: string | Record<string, string | number>;
+
     /** All other SVG attributes (cx, cy, r, fill, stroke, etc.) */
     [key: string]: any;
 }
@@ -431,9 +465,9 @@ export interface _PxNode {
  * `{ type:string, animate?:ElementAnimation, style?:string|Record<string,string|number>, [key:string]:any }`
  */
 export const PxNodeBase = px.openObject({
-    type:    px.string(),
+    type: px.string(),
     animate: PxElementAnimationSchema.optional(),
-    style:   px.union([px.string(), px.record(px.union([px.string(), px.number()]))]).optional(),
+    style: px.union([px.string(), px.record(px.union([px.string(), px.number()]))]).optional(),
 });
 
 // `let` so the lazy closure can capture the variable reference after assignment.
@@ -466,18 +500,25 @@ export interface PxNode extends PxInfer<typeof PxNodeBase> {
  * Extends PxNode with SVG-specific properties and global configuration.
  */
 export interface _PxSvgNode extends PxNode {
+
     /** FIXME - do we need it? SVG viewport width */
     width?: number;
+
     /** FIXME - do we need it? SVG viewport height */
     height?: number;
+
     /** FIXME - do we need it? SVG viewBox attribute defining coordinate system */
     viewBox?: string;
+
     /** Global animation configuration */
     animator?: PxAnimatorConfig;
+
     /** Reusable definitions library */
     defs?: PxDefs;
+
     /** Animation bindings for pre-rendered DOM elements */
     bindings?: PxBinding[];
+
     design?: PxNode;
 }
 
@@ -488,11 +529,11 @@ export interface _PxSvgNode extends PxNode {
  * `{ width?:number, height?:number, viewBox?:string, animator?:AnimatorConfig, defs?:Defs, bindings?:Binding[] }`
  */
 export const PxSvgNodeExtra = px.object({
-    width:    px.number().optional(),
-    height:   px.number().optional(),
-    viewBox:  px.string().optional(),
+    width: px.number().optional(),
+    height: px.number().optional(),
+    viewBox: px.string().optional(),
     animator: PxAnimatorConfigSchema.optional(),
-    defs:     PxDefsSchema.optional(),
+    defs: PxDefsSchema.optional(),
     bindings: px.array(PxBindingSchema).optional(),
 });
 
@@ -522,9 +563,9 @@ export interface PxSvgNode extends PxNode, PxInfer<typeof PxSvgNodeExtra> {
 export const PxAnimatedSvgDocumentSchema = px.object({
     ...PxNodeBase._shape,
     ...PxSvgNodeExtra._shape,
-    type:     px.literal('svg'),     // override string → literal to require 'svg'
+    type: px.literal('svg'),     // override string → literal to require 'svg'
     children: px.array(PxNodeSchema).optional(),
-    design:   PxNodeSchema.optional(),
+    design: PxNodeSchema.optional(),
 });
 
 /**
@@ -568,12 +609,16 @@ export type PxPoint2D = Array<number>;
 
 /** Represents a vector path for SVG shape animations. */
 export interface _PxBezierPath {
+
     /** An array of vertex points [[x, y], ...]. */
     v: Array<PxPoint2D>;
+
     /** An array of 'in' tangent handles for each vertex [[x, y], ...]. */
     i?: Array<PxPoint2D>;
+
     /** An array of 'out' tangent handles for each vertex [[x, y], ...]. */
     o?: Array<PxPoint2D>;
+    
     /** A boolean indicating if the path is closed. */
     c?: boolean;
 }
@@ -588,6 +633,7 @@ export const PxBezierPathSchema = implementsInterface<_PxBezierPath>()(px.object
 
 /** Represents a vector path for SVG shape animations. */
 export type PxBezierPath = PxInfer<typeof PxBezierPathSchema>;
+const _ck_PxBezierPath: KeysMatch<PxBezierPath, _PxBezierPath> = true; // the key sets are identical
 
 
 // ============================================================================
