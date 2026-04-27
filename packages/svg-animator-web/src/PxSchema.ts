@@ -511,6 +511,24 @@ class Tuple<T extends ReadonlyArray<PxSchema<any, any>>> extends Base<TupleItems
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// implementsInterface — compile-time lock between a schema and an interface
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns a pass-through wrapper that enforces at compile time that the schema's
+ * inferred type extends `T`. Place the interface definition before the schema and
+ * wrap the schema with this call — TypeScript will error at the schema declaration
+ * if the two ever diverge.
+ *
+ * @example
+ * export const PxLoopSchema = implementsInterface<_PxLoop>()(px.object({ ... }));
+ */
+export function implementsInterface<T>() {
+    return <S extends PxSchema<T>>(schema: S): S => schema;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Public factory
 // ─────────────────────────────────────────────────────────────────────────────
 

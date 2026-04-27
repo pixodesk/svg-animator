@@ -3,7 +3,7 @@
  * Licensed under the MIT License. See the LICENSE file in the project root for details.
  *---------------------------------------------------------------------------------------*/
 
-import { px } from './PxSchema';
+import { px, implementsInterface } from './PxSchema';
 import type { PxInfer, PxSchema } from './PxSchema';
 
 export type FillMode = 'forwards' | 'backwards' | 'both' | 'none';
@@ -64,22 +64,39 @@ export type PxEasingOrRef = PxInfer<typeof PxEasingOrRefSchema>;
 /**
  * A single animation keyframe defining the state at a specific point in time.
  * Supports both full property names and short aliases for compact notation.
- *
- * `{ time?:number, t?:number, value?:any, v?:any, easing?:Easing, e?:Easing }`
  */
-export const PxKeyframeSchema = px.object({
-    time:   px.number().optional(),         // Timestamp in milliseconds from animation start
-    t:      px.number().optional(),         // Short alias for "time"
-    value:  px.any().optional(),            // The value of the animated property at this keyframe
-    v:      px.any().optional(),            // Short alias for "value"
-    easing: PxEasingOrRefSchema.optional(), // Easing function applied to the interval leading into this keyframe
-    e:      PxEasingOrRefSchema.optional(), // Short alias for "easing"
-});
+export interface _PxKeyframe {
+    
+    /** Timestamp in milliseconds from animation start */
+    time?: number;
+    
+    /** Short alias for "time" */
+    t?: number;
+    
+    /** The value of the animated property at this keyframe */
+    value?: any;
+    
+    /** Short alias for "value" */
+    v?: any;
+    
+    /** Easing function applied to the interval leading into this keyframe */
+    easing?: PxEasingOrRef;
+    
+    /** Short alias for "easing" */
+    e?: PxEasingOrRef;
+}
 
-/**
- * A single animation keyframe defining the state at a specific point in time.
- * Supports both full property names and short aliases for compact notation.
- */
+// `{ time?:number, t?:number, value?:any, v?:any, easing?:Easing, e?:Easing }`
+export const PxKeyframeSchema = implementsInterface<_PxKeyframe>()(px.object({
+    time:   px.number().optional(),
+    t:      px.number().optional(),
+    value:  px.any().optional(),
+    v:      px.any().optional(),
+    easing: PxEasingOrRefSchema.optional(),
+    e:      PxEasingOrRefSchema.optional(),
+}));
+
+/** A single animation keyframe defining the state at a specific point in time. */
 export type PxKeyframe = PxInfer<typeof PxKeyframeSchema>;
 
 
@@ -91,16 +108,11 @@ export type PxKeyframe = PxInfer<typeof PxKeyframeSchema>;
  * Defines how a property's keyframe animation is extended beyond its defined keyframe range
  * by continuously repeating a chosen segment of the sequence.
  *
- * `{ segmentCount?:number, before?:boolean, alternate?:boolean }`
+ * The repeated segment is a contiguous run of keyframe *intervals* (gaps between consecutive
+ * keyframes). Which end of the sequence is repeated is controlled by `before`, and whether
+ * each repetition plays in the same direction or alternates is controlled by `alternate`.
  */
-export const PxLoopSchema = px.object({
-    segmentCount: px.number().optional(),   // Number of keyframe intervals forming the segment; undefined = whole sequence
-    before:       px.boolean().optional(),  // true = loop before first keyframe (intro); false (default) = loop after last keyframe
-    alternate:    px.boolean().optional(),  // true = pingpong (reverse direction each iteration); false (default) = cycle
-});
-
 export interface _PxLoop {
-
     /**
      * Number of keyframe intervals (gaps between consecutive keyframes) that form the repeating
      * segment.
@@ -135,13 +147,16 @@ export interface _PxLoop {
     alternate?: boolean;
 }
 
+// `{ segmentCount?:number, before?:boolean, alternate?:boolean }`
+export const PxLoopSchema = implementsInterface<_PxLoop>()(px.object({
+    segmentCount: px.number().optional(),
+    before:       px.boolean().optional(),
+    alternate:    px.boolean().optional(),
+}));
+
 /**
  * Defines how a property's keyframe animation is extended beyond its defined keyframe range
  * by continuously repeating a chosen segment of the sequence.
- *
- * The repeated segment is a contiguous run of keyframe *intervals* (gaps between consecutive
- * keyframes). Which end of the sequence is repeated is controlled by `before`, and whether
- * each repetition plays in the same direction or alternates is controlled by `alternate`.
  */
 export type PxLoop = PxInfer<typeof PxLoopSchema>;
 
@@ -153,31 +168,25 @@ export type PxLoop = PxInfer<typeof PxLoopSchema>;
 /**
  * Animation definition for a single CSS/SVG property.
  * Contains an array of keyframes that define how the property changes over time.
- *
- * `{ keyframes?:Keyframe[], kfs?:Keyframe[], loop?:Loop|boolean }`
  */
-export const PxPropertyAnimationSchema = px.object({
-    keyframes: px.array(PxKeyframeSchema).optional(),             // Array of keyframes defining the animation timeline
-    kfs:       px.array(PxKeyframeSchema).optional(),             // Short alias for "keyframes"
-    loop:      px.union([PxLoopSchema, px.boolean()]).optional(), // Loop config; true = repeat the whole sequence
-});
-
 export interface _PxPropertyAnimation {
     /** Array of keyframes defining the animation timeline */
     keyframes?: PxKeyframe[];
-
     /** Short alias for "keyframes" */
     kfs?: PxKeyframe[];
-
     /** Optional loop configuration. When set, the keyframe sequence is extended beyond its defined
      *  range by repeating a chosen segment. See {@link PxLoop} for details. */
     loop?: PxLoop | boolean;
 }
 
-/**
- * Animation definition for a single CSS/SVG property.
- * Contains an array of keyframes that define how the property changes over time.
- */
+// `{ keyframes?:Keyframe[], kfs?:Keyframe[], loop?:Loop|boolean }`
+export const PxPropertyAnimationSchema = implementsInterface<_PxPropertyAnimation>()(px.object({
+    keyframes: px.array(PxKeyframeSchema).optional(),
+    kfs:       px.array(PxKeyframeSchema).optional(),
+    loop:      px.union([PxLoopSchema, px.boolean()]).optional(),
+}));
+
+/** Animation definition for a single CSS/SVG property. */
 export type PxPropertyAnimation = PxInfer<typeof PxPropertyAnimationSchema>;
 
 
@@ -189,26 +198,21 @@ export type PxPropertyAnimation = PxInfer<typeof PxPropertyAnimationSchema>;
  * Complete animation definition containing one or more property animations.
  * Each key is a CSS/SVG property name (e.g., "opacity", "translate", "fill").
  *
- * `Record<propName, PropertyAnimation>`
- *
  * @example
  * { "opacity": { keyframes: [...] }, "translate": { keyframes: [...] } }
  */
-export const PxAnimationDefinitionSchema = px.record(PxPropertyAnimationSchema);
-
 export interface _PxAnimationDefinition {
     [property: string]: PxPropertyAnimation;
 }
 
+// `Record<propName, PropertyAnimation>`
+export const PxAnimationDefinitionSchema = implementsInterface<_PxAnimationDefinition>()(
+    px.record(PxPropertyAnimationSchema)
+);
+
 /**
  * Complete animation definition containing one or more property animations.
  * Each key is a CSS/SVG property name (e.g., "opacity", "scale", "rotate").
- *
- * @example
- * {
- *   "opacity": { keyframes: [...] },
- *   "scale": { keyframes: [...] }
- * }
  */
 export type PxAnimationDefinition = PxInfer<typeof PxAnimationDefinitionSchema>;
 
@@ -224,39 +228,28 @@ export type PxAnimationDefinition = PxInfer<typeof PxAnimationDefinitionSchema>;
  * - An inline `AnimationDefinition` object
  * - A mixed array of references and inline definitions
  *
- * `string | Array<string|AnimationDefinition> | AnimationDefinition`
- *
  * @example
  * "fadeIn"
  * ["fadeIn", "spin"]
  * { opacity: { keyframes: [...] } }
  * ["fadeIn", { scale: { keyframes: [...] } }]
  */
-export const PxElementAnimationSchema = px.union([
-    px.string(),
-    px.array(px.union([px.string(), PxAnimationDefinitionSchema])),
-    PxAnimationDefinitionSchema,
-]);
-
 export type _PxElementAnimation =
     | string
     | string[]
     | PxAnimationDefinition
     | (string | PxAnimationDefinition)[];
 
+// `string | Array<string|AnimationDefinition> | AnimationDefinition`
+export const PxElementAnimationSchema = implementsInterface<_PxElementAnimation>()(px.union([
+    px.string(),
+    px.array(px.union([px.string(), PxAnimationDefinitionSchema])),
+    PxAnimationDefinitionSchema,
+]));
+
 /**
  * Element animation specification.
- * Can be:
- * - A string referencing a named animation from defs
- * - An array of named animation references
- * - An inline PxAnimationDefinition object
- * - A mixed array of references and inline definitions
- *
- * @example
- * "fadeIn"
- * ["fadeIn", "spin"]
- * { opacity: { keyframes: [...] } }
- * ["fadeIn", { scale: { keyframes: [...] } }]
+ * Can be a string reference, array of references, inline definition, or a mixed array.
  */
 export type PxElementAnimation = PxInfer<typeof PxElementAnimationSchema>;
 
@@ -269,30 +262,24 @@ type StartOnExtra = StartOn | 'programmatic';
 
 /**
  * Defines when and how an animation should be triggered.
- *
- * `{ startOn?:'load'|'mouseOver'|'click'|'scrollIntoView'|'programmatic',
- *    outAction?:'continue'|'pause'|'reset'|'reverse', scrollIntoViewThreshold?:number }`
  */
-export const PxTriggerSchema = px.object({
-    startOn:                 px.enum(['load', 'mouseOver', 'click', 'scrollIntoView', 'programmatic'] as const).optional(),
-    outAction:               px.enum(['continue', 'pause', 'reset', 'reverse'] as const).optional(),
-    scrollIntoViewThreshold: px.number().optional(), // Fraction of element visibility required (0–1); only for scrollIntoView
-});
-
 export interface _PxTrigger {
     /** Event that starts the animation */
     startOn?: StartOnExtra;
-
     /** Action to take when the trigger condition is no longer met (e.g., mouse leaves) */
     outAction?: 'continue' | 'pause' | 'reset' | 'reverse';
-
-    /** Percentage of element visibility required to trigger (0-1). Only applies to scrollIntoView. */
+    /** Percentage of element visibility required to trigger (0–1). Only applies to scrollIntoView. */
     scrollIntoViewThreshold?: number;
 }
 
-/**
- * Defines when and how an animation should be triggered.
- */
+// `{ startOn?:'load'|'mouseOver'|'click'|'scrollIntoView'|'programmatic', outAction?:..., scrollIntoViewThreshold?:number }`
+export const PxTriggerSchema = implementsInterface<_PxTrigger>()(px.object({
+    startOn:                 px.enum(['load', 'mouseOver', 'click', 'scrollIntoView', 'programmatic'] as const).optional(),
+    outAction:               px.enum(['continue', 'pause', 'reset', 'reverse'] as const).optional(),
+    scrollIntoViewThreshold: px.number().optional(),
+}));
+
+/** Defines when and how an animation should be triggered. */
 export type PxTrigger = PxInfer<typeof PxTriggerSchema>;
 
 
@@ -303,38 +290,16 @@ export type PxTrigger = PxInfer<typeof PxTriggerSchema>;
 /**
  * Global animation configuration that applies to all animations in the document.
  * Defines timing, playback behaviour, and rendering strategy.
- *
- * `{ mode?:'auto'|'webapi'|'frames', duration?:number, delay?:number,
- *    iterations?:number|'infinite', fill?:'forwards'|'backwards'|'both'|'none',
- *    direction?:'normal'|'reverse'|'alternate'|'alternate-reverse',
- *    frameRate?:number, trigger?:Trigger, debug?:boolean, debugInstName?:string }`
  */
-export const PxAnimatorConfigSchema = px.object({
-    mode:          px.enum(['auto', 'webapi', 'frames'] as const).optional(),                            // JavaScript animation implementation strategy
-    duration:      px.number().optional(),                                                               // Total animation duration in milliseconds
-    delay:         px.number().optional(),                                                               // Delay before animation starts in milliseconds
-    iterations:    px.union([px.number(), px.literal('infinite')]).optional(),                           // Repeat count; "infinite" for endless loop
-    fill:          px.enum(['forwards', 'backwards', 'both', 'none'] as const).optional(),              // Values applied before/after active period; defaults to 'forwards' so elements hold their final state
-    direction:     px.enum(['normal', 'reverse', 'alternate', 'alternate-reverse'] as const).optional(), // Playback direction
-    frameRate:     px.number().optional(),                                                               // Target frame rate; only applies when mode="frames"
-    trigger:       PxTriggerSchema.optional(),                                                           // When and how the animation starts
-    debug:         px.boolean().optional(),                                                              // FIXME - implement
-    debugInstName: px.string().optional(),                                                               // FIXME - implement
-});
-
 export interface _PxAnimatorConfig {
     /** JavaScript animation implementation strategy */
     mode?: JsMode;
-
     /** Total animation duration in milliseconds */
     duration?: number;
-
     /** Delay before animation starts in milliseconds */
     delay?: number;
-
     /** Number of times to repeat the animation. Use "infinite" for endless loop. */
     iterations?: number | "infinite";
-
     /**
      * Defines which values are applied before/after the active animation period
      * (maps directly to the Web Animations API `fill` option).
@@ -344,20 +309,29 @@ export interface _PxAnimatorConfig {
      * elements to revert to their pre-animation state.
      */
     fill?: FillMode;
-
     /** Direction of animation playback */
     direction?: PlaybackDirection;
-
     /** Target frame rate for frame-based animations (only applicable when mode="frames") */
     frameRate?: number;
-
     /** Trigger configuration for when animation should start */
     trigger?: PxTrigger;
-
-    debug?: boolean; // FIXME - implement
-
-    debugInstName?: string; // FIXME - implement
+    debug?: boolean;         // FIXME - implement
+    debugInstName?: string;  // FIXME - implement
 }
+
+// `{ mode?, duration?, delay?, iterations?, fill?, direction?, frameRate?, trigger?, debug?, debugInstName? }`
+export const PxAnimatorConfigSchema = implementsInterface<_PxAnimatorConfig>()(px.object({
+    mode:          px.enum(['auto', 'webapi', 'frames'] as const).optional(),
+    duration:      px.number().optional(),
+    delay:         px.number().optional(),
+    iterations:    px.union([px.number(), px.literal('infinite')]).optional(),
+    fill:          px.enum(['forwards', 'backwards', 'both', 'none'] as const).optional(),
+    direction:     px.enum(['normal', 'reverse', 'alternate', 'alternate-reverse'] as const).optional(),
+    frameRate:     px.number().optional(),
+    trigger:       PxTriggerSchema.optional(),
+    debug:         px.boolean().optional(),
+    debugInstName: px.string().optional(),
+}));
 
 /**
  * Global animation configuration that applies to all animations in the document.
@@ -373,40 +347,27 @@ export type PxAnimatorConfig = PxInfer<typeof PxAnimatorConfigSchema>;
 /**
  * Reusable definitions library for easings, animations, and styles.
  * Defined once here, referenced by name on elements.
- *
- * `{ easings?:Record<name,[x1,y1,x2,y2]>, animations?:Record<name,AnimationDefinition>,
- *    styles?:Record<string,any> }`
  */
-export const PxDefsSchema = px.object({
-    easings:    px.record(px.tuple([px.number(), px.number(), px.number(), px.number()] as const)).optional(), // Named cubic-bezier easing functions
-    animations: px.record(PxAnimationDefinitionSchema).optional(), // Named animation definitions referenceable by elements
-    styles:     px.record(px.any()).optional(),                     // FIXME - do we need it? Named style presets
-});
-
 export interface _PxDefs {
     /** Named cubic-bezier easing functions */
-    easings?: {
-        [name: string]: [number, number, number, number];
-    };
-
+    easings?: { [name: string]: [number, number, number, number]; };
     /** Named animation definitions that can be referenced by elements */
-    animations?: {
-        [name: string]: PxAnimationDefinition;
-    };
-
+    animations?: { [name: string]: PxAnimationDefinition; };
     /**
      * FIXME - do we need it?
      * Named style presets for common styling patterns
      */
-    styles?: {
-        [name: string]: Record<string, string | number>;
-    };
+    styles?: { [name: string]: Record<string, string | number>; };
 }
 
-/**
- * Reusable definitions library for easings, animations, and styles.
- * Allows to define once and referencing by name.
- */
+// `{ easings?:Record<name,[x1,y1,x2,y2]>, animations?:Record<name,AnimationDefinition>, styles?:Record<string,any> }`
+export const PxDefsSchema = implementsInterface<_PxDefs>()(px.object({
+    easings:    px.record(px.tuple([px.number(), px.number(), px.number(), px.number()] as const)).optional(),
+    animations: px.record(PxAnimationDefinitionSchema).optional(),
+    styles:     px.record(px.any()).optional(),
+}));
+
+/** Reusable definitions library for easings, animations, and styles. */
 export type PxDefs = PxInfer<typeof PxDefsSchema>;
 
 
@@ -417,21 +378,19 @@ export type PxDefs = PxInfer<typeof PxDefsSchema>;
 /**
  * Binds animations to existing DOM elements by ID.
  * Used when the SVG tree is pre-rendered and animations are applied separately.
- *
- * `{ id:string, animate:ElementAnimation }`
  */
-export const PxBindingSchema = px.object({
-    id:      px.string(),              // Targets elements in the DOM via data-px-id="..."
-    animate: PxElementAnimationSchema, // Animation to apply to matched elements
-});
-
 export interface _PxBinding {
     /** ID targeting elements in the DOM (data-px-id="...") */
     id: string;
-
     /** Animation to apply to matched elements */
     animate: PxElementAnimation;
 }
+
+// `{ id:string, animate:ElementAnimation }`
+export const PxBindingSchema = implementsInterface<_PxBinding>()(px.object({
+    id:      px.string(),
+    animate: PxElementAnimationSchema,
+}));
 
 /**
  * Binds animations to existing DOM elements via CSS selectors.
@@ -445,17 +404,36 @@ export type PxBinding = PxInfer<typeof PxBindingSchema>;
 // ============================================================================
 
 /**
+ * Base interface for all SVG elements.
+ * Named properties take precedence over the index signature when accessed.
+ */
+export interface _PxNode {
+    /** SVG element type (e.g., "circle", "rect", "path", "g") */
+    type: string;
+    /** Child elements (for container elements like <g>) */
+    children?: PxNode[];
+    /** Animation applied to this element */
+    animate?: PxElementAnimation;
+    /**
+     * FIXME - do we need it?
+     * Style applied to this element (named reference or inline object)
+     */
+    style?: string | Record<string, string | number>;
+    /** All other SVG attributes (cx, cy, r, fill, stroke, etc.) */
+    [key: string]: any;
+}
+
+/**
  * Base shape for all SVG element nodes.
  * Open object: validated known keys + arbitrary SVG attributes passed through unchanged (cx, cy, r, fill, stroke, …).
- *
  * Non-recursive — excludes `children` (circular reference). Used for type extraction via PxInfer.
  *
  * `{ type:string, animate?:ElementAnimation, style?:string|Record<string,string|number>, [key:string]:any }`
  */
 export const PxNodeBase = px.openObject({
-    type:    px.string(),                                                                             // SVG element type (e.g. "circle", "rect", "path", "g")
-    animate: PxElementAnimationSchema.optional(),                                                     // Animation applied to this element
-    style:   px.union([px.string(), px.record(px.union([px.string(), px.number()]))]).optional(),     // FIXME - do we need it? Inline style or named style reference
+    type:    px.string(),
+    animate: PxElementAnimationSchema.optional(),
+    style:   px.union([px.string(), px.record(px.union([px.string(), px.number()]))]).optional(),
 });
 
 // `let` so the lazy closure can capture the variable reference after assignment.
@@ -466,26 +444,6 @@ let PxNodeSchema: PxSchema<any> = px.openObject({
     children: px.lazy(() => px.array(PxNodeSchema), []).optional(),
 });
 export { PxNodeSchema };
-
-export interface _PxNode {
-    /** SVG element type (e.g., "circle", "rect", "path", "g") */
-    type: string;
-
-    /** Child elements (for container elements like <g>) */
-    children?: PxNode[];
-
-    /** Animation applied to this element */
-    animate?: PxElementAnimation;
-
-    /**
-     * FIXME - do we need it?
-     * Style applied to this element (named reference or inline object)
-     */
-    style?: string | Record<string, string | number>;
-
-    /** All other SVG attributes (cx, cy, r, fill, stroke, etc.) */
-    [key: string]: any;
-}
 
 /**
  * Base interface for all SVG elements.
@@ -504,46 +462,39 @@ export interface PxNode extends PxInfer<typeof PxNodeBase> {
 // ============================================================================
 
 /**
+ * Root SVG element containing the entire animated graphic.
+ * Extends PxNode with SVG-specific properties and global configuration.
+ */
+export interface _PxSvgNode extends PxNode {
+    /** FIXME - do we need it? SVG viewport width */
+    width?: number;
+    /** FIXME - do we need it? SVG viewport height */
+    height?: number;
+    /** FIXME - do we need it? SVG viewBox attribute defining coordinate system */
+    viewBox?: string;
+    /** Global animation configuration */
+    animator?: PxAnimatorConfig;
+    /** Reusable definitions library */
+    defs?: PxDefs;
+    /** Animation bindings for pre-rendered DOM elements */
+    bindings?: PxBinding[];
+    design?: PxNode;
+}
+
+/**
  * Extra fields present on the root SVG node, on top of PxNode.
  * Excludes `design` (circular reference to PxNode). Used for type extraction via PxInfer.
  *
- * `{ width?:number, height?:number, viewBox?:string, animator?:AnimatorConfig,
- *    defs?:Defs, bindings?:Binding[] }`
+ * `{ width?:number, height?:number, viewBox?:string, animator?:AnimatorConfig, defs?:Defs, bindings?:Binding[] }`
  */
 export const PxSvgNodeExtra = px.object({
-    width:    px.number().optional(),                   // FIXME - do we need it? SVG viewport width
-    height:   px.number().optional(),                   // FIXME - do we need it? SVG viewport height
-    viewBox:  px.string().optional(),                   // FIXME - do we need it? SVG viewBox defining the coordinate system
-    animator: PxAnimatorConfigSchema.optional(),        // Global animation configuration
-    defs:     PxDefsSchema.optional(),                  // Reusable definitions library (easings, animations, styles)
-    bindings: px.array(PxBindingSchema).optional(),     // Animation bindings for pre-rendered DOM elements
+    width:    px.number().optional(),
+    height:   px.number().optional(),
+    viewBox:  px.string().optional(),
+    animator: PxAnimatorConfigSchema.optional(),
+    defs:     PxDefsSchema.optional(),
+    bindings: px.array(PxBindingSchema).optional(),
 });
-
-export interface _PxSvgNode extends PxNode {
-
-    /** FIXME - do we need it?
-     * SVG viewport width */
-    width?: number;
-
-    /** FIXME - do we need it?
-     * SVG viewport height */
-    height?: number;
-
-    /** FIXME - do we need it?
-     * SVG viewBox attribute defining coordinate system */
-    viewBox?: string;
-
-    /** Global animation configuration */
-    animator?: PxAnimatorConfig;
-
-    /** Reusable definitions library */
-    defs?: PxDefs;
-
-    /** Animation bindings for pre-rendered DOM elements */
-    bindings?: PxBinding[];
-
-    design?: PxNode;
-}
 
 /**
  * Root SVG element containing the entire animated graphic.
@@ -615,32 +566,25 @@ export type PxPoint2D = Array<number>;
 // BEZIER PATH
 // ============================================================================
 
-/**
- * Represents a vector path for SVG shape animations.
- *
- * `{ v:number[][], i?:number[][], o?:number[][], c?:boolean }`
- */
-export const PxBezierPathSchema = px.object({
-    v: px.array(px.array(px.number())),            // Vertex points [[x, y], ...]
-    i: px.array(px.array(px.number())).optional(), // 'In' tangent handles for each vertex [[x, y], ...]
-    o: px.array(px.array(px.number())).optional(), // 'Out' tangent handles for each vertex [[x, y], ...]
-    c: px.boolean().optional(),                    // Whether the path is closed
-});
-
+/** Represents a vector path for SVG shape animations. */
 export interface _PxBezierPath {
-
     /** An array of vertex points [[x, y], ...]. */
     v: Array<PxPoint2D>;
-
     /** An array of 'in' tangent handles for each vertex [[x, y], ...]. */
     i?: Array<PxPoint2D>;
-
     /** An array of 'out' tangent handles for each vertex [[x, y], ...]. */
     o?: Array<PxPoint2D>;
-
     /** A boolean indicating if the path is closed. */
     c?: boolean;
 }
+
+// `{ v:number[][], i?:number[][], o?:number[][], c?:boolean }`
+export const PxBezierPathSchema = implementsInterface<_PxBezierPath>()(px.object({
+    v: px.array(px.array(px.number())),
+    i: px.array(px.array(px.number())).optional(),
+    o: px.array(px.array(px.number())).optional(),
+    c: px.boolean().optional(),
+}));
 
 /** Represents a vector path for SVG shape animations. */
 export type PxBezierPath = PxInfer<typeof PxBezierPathSchema>;
