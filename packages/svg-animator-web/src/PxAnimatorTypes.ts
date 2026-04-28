@@ -79,7 +79,7 @@ export interface _PxKeyframe {
     /** Short alias for "value" */
     v?: any;
 
-    /** Easing function applied to the interval leading into this keyframe */
+    /** Easing function applied to the interval from this keyframe to the next */
     easing?: PxEasingOrRef;
 
     /** Short alias for "easing" */

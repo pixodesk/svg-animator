@@ -116,6 +116,9 @@ function parseSvgPathToBezier(d: string): Array<PxBezierPath> {
 
         } else if (type === 'Z' || type === 'z') {
             currentPath.c = true;
+
+        } else {
+            console.warn('Unsupported path command "' + type + '"');
         }
     }
 
@@ -675,7 +678,7 @@ function calcPropertyValue(
     // remap to local 0..1 within prevKf..nextKf
     let localProgress = (prevKf === nextKf) ? 0 : remap(progress, prevKf.t ?? 0, nextKf.t ?? 0, 0, 1);
     localProgress = clamp(localProgress, 0, 1);
-    const easing = prevKf.e ?? prevKf.easing;
+    const easing = prevKf.e ?? prevKf.easing; // e is on the source keyframe: applied from this KF to the next
     if (easing && Array.isArray(easing)) {
         try {
             localProgress = cubicBezier(easing as [number, number, number, number])(localProgress);

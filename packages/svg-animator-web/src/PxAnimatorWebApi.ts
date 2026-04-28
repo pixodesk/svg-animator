@@ -25,7 +25,7 @@ import { getNormalisedBindings, interpolateValue } from './PxDefinitions';
  */
 function createCssKf(kf: PxKeyframe, t: number, propName: string, unsupportedSet: Set<string>) {
     let value = kf.v ?? kf.value;
-    const e = kf.e ?? kf.easing;
+    const e = kf.e ?? kf.easing; // e is on the source keyframe: applied from this KF to the next (matches WAAPI easing convention)
 
     const cssKf: Keyframe = {
         offset: t,
