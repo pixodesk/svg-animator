@@ -456,19 +456,43 @@ The `data` object passed to `createAnimator` is the same `PxAnimatedSvgDocument`
                     smooth: [0.42, 0, 0.58, 1],
                 },
                 animations: {
-                    fadeIn:     { opacity:            { keyframes: [{ t: 0, v: 0 }, { t: 2000, v: 1 }] } },
-                    colorShift: { fill:               { keyframes: [{ t: 0, v: '#3b82f6' }, { t: 2000, v: '#ec4899', e: 'smooth' }] } },
-                    slideIn:    { translate:          { keyframes: [{ t: 0, v: [-80, 0] }, { t: 2000, v: [0, 0] }] } },
-                    pulse:      { scale:              { keyframes: [{ t: 0, v: [1, 1] }, { t: 1000, v: [1.2, 1.2] }, { t: 2000, v: [1, 1] }], loop: true } },
-                    spin:       { rotate:             { keyframes: [{ t: 0, v: 0 }, { t: 1000, v: 360 }], loop: { segmentCount: 1, before: false, alternate: false } } },
-                    morph:      { d:                  { keyframes: [{ t: 0, v: 'M-50,0 L0,-50 L50,0 L0,50 Z' }, { t: 2000, v: 'M-50,-50 L50,-50 L50,50 L-50,50 Z' }] } },
-                    draw:       { 'stroke-dasharray': { keyframes: [{ t: 0, v: [0, 300] }, { t: 2000, v: [300, 300] }] } },
+                    fadeIn:     { opacity:            { keyframes: [
+                        { t: 0, v: 0 }, 
+                        { t: 2000, v: 1 }] } },
+                    colorShift: { fill:               { keyframes: [
+                        { t: 0, v: '#3b82f6' }, 
+                        { t: 2000, v: '#ec4899', e: 'smooth' }] } },
+                    slideIn:    { translate:          { keyframes: [
+                        { t: 0, v: [-80, 0] }, 
+                        { t: 2000, v: [0, 0] }] } },
+                    pulse:      { scale:              { 
+                      keyframes: [
+                        { t: 0, v: [1, 1] }, 
+                        { t: 1000, v: [1.2, 1.2] }, 
+                        { t: 2000, v: [1, 1] }
+                      ], 
+                      loop: true 
+                    } },
+                    spin:       { rotate:             { 
+                      keyframes: [{ t: 0, v: 0 }, { t: 1000, v: 360 }], 
+                      loop: { segmentCount: 1, before: false, alternate: false } 
+                    } },
+                    morph:      { d:                  { keyframes: [
+                        { t: 0, v: 'M-50,0 L0,-50 L50,0 L0,50 Z' }, 
+                        { t: 2000, v: 'M-50,-50 L50,-50 L50,50 L-50,50 Z' }] } },
+                    draw:       { 'stroke-dasharray': { keyframes: [
+                        { t: 0, v: [0, 300] },
+                        { t: 2000, v: [300, 300] }] 
+                    } },
                 },
             },
             animate: {
-                _px_rect:    'fadeIn',                   // single named ref
-                _px_ellipse: ['colorShift', 'slideIn'],  // array of refs
-                _px_group:   ['pulse', { translate: { keyframes: [{ t: 0, v: [0, 0] }, { t: 2000, v: [40, 0] }] } }], // mixed
+                _px_rect:    'fadeIn',                              // single named ref
+                _px_ellipse: ['colorShift', 'slideIn'],             // array of refs
+                _px_group:   ['pulse', { translate: { keyframes: [  // mixed
+                    { t: 0, v: [0, 0] }, 
+                    { t: 2000, v: [40, 0] }
+                ] } }],
                 _px_icon:    'spin',
                 _px_morph:   'morph',
                 _px_path:    'draw',
