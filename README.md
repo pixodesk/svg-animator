@@ -138,9 +138,95 @@ graph TD
 ## File formats
 
 
-### JSON File format overview
+#### JSON format schema reference
 
-A JSON document that closely mirrors SVG structure, with animation keyframes and metadata embedded alongside element definitions. JavaScript constructs the DOM at runtime using a framework component or the runtime API.
+```typescript
+// PxPropertyAnimation — single-property animation
+// short aliases: kfs=keyframes; t=time, v=value, e=easing on each keyframe
+interface ANIMATE {
+    keyframes?: Array<{
+        time?: number;    // ms offset from animation start; alias: t
+        value?: any;      // value at this keyframe (number, string, [x,y], path…); alias: v
+        easing?: string | [number, number, number, number]; // named ref or cubic-bezier [x1,y1,x2,y2]; alias: e
+    }>;
+    // pre-processes keyframes to fill animator.duration by repeating a segment
+    // true → default: repeat last segment, cycling forward
+    // independent of animator.iterations; composes as loop-within-loop
+    loop?: boolean | {
+        segmentCount?: number; // intervals forming the segment; undefined = whole sequence; clamped [1, n-1]
+        before?: boolean;      // false (default) = loop end (idle/outro); true = loop start (intro)
+        alternate?: boolean;   // false (default) = cycle same direction; true = pingpong
+    };
+}
+```
+
+```typescript
+// PxAnimatedSvgDocument
+// Mode A: has children — player renders SVG tree and animates it
+// Mode B: no children — player animates a pre-existing SVG DOM via animator.animate
+interface SVG_JSON {
+    type: 'svg';        // document root marker
+    id?: string;        // DOM id; in Mode B used to locate the pre-rendered element
+    viewBox?: string;   // internal coordinate space, e.g. "0 0 700 380"
+    width?: number;     // rendered size; width accepts CSS units
+    height?: number;
+    [key: string]: any; // any SVG/CSS presentation attribute; pass-through to DOM
+
+    animator?: {
+        delay?: number;                    // delay before start, ms
+        duration?: number;                 // total timeline length, ms; keyframe t values are absolute offsets
+        iterations?: number | 'infinite'; // repeat count; composes with per-property loop (loop-within-loop)
+        fill?: 'forwards' | 'backwards' | 'both' | 'none'; // WAAPI fill; default 'forwards' holds final state
+        direction?: 'normal' | 'reverse' | 'alternate' | 'alternate-reverse';
+        mode?: 'auto' | 'webapi' | 'frames'; // 'auto' = WAAPI→RAF fallback; 'webapi' = WAAPI; 'frames' = RAF
+        frameRate?: number;                // target fps; RAF mode only
+
+        trigger?: {
+            startOn?: 'load' | 'mouseOver' | 'click' | 'scrollIntoView' | 'programmatic';
+            outAction?: 'continue' | 'pause' | 'reset' | 'reverse';
+            scrollIntoViewThreshold?: number; // visibility fraction (0–1); scrollIntoView only
+        };
+
+        // named reusable easings and animations; resolved at runtime
+        // materialise (inline) all refs before handing to a dumb player
+        definitions?: {
+            easings?: Record<string, [number, number, number, number]>; // name → [x1,y1,x2,y2]
+            animations?: Record<string, Record<string, ANIMATE>>;       // name → { propName: ANIMATE }
+        };
+
+        // Mode B — maps elementId → animation spec
+        // value: named ref / array of refs / inline definition / mixed array
+        animate?: Record<string,
+            | string
+            | Array<string>
+            | Record<string, ANIMATE>
+            | Array<string | Record<string, ANIMATE>>
+        >;
+    };
+
+    // Mode A — SVG element tree; absence of children signals Mode B
+    children?: Array<{
+        type: string;       // SVG element tag: "rect", "g", "path", "ellipse", "use", …
+        id?: string;        // DOM id; required for href="#id" refs or animator.animate targeting
+        [key: string]: any; // SVG/CSS attrs (cx, cy, r, fill, stroke, transform, …); pass-through
+        style?: string | Record<string, string | number>;
+        // named ref / array of refs / inline definition / mixed array
+        animate?: string | Array<string> | Record<string, ANIMATE> | Array<string | Record<string, ANIMATE>>;
+        meta?: any;         // editor-only (label, shape, …); not rendered, ignored by player
+        children?: Array<any>; // recursive; <g>, <defs>, <symbol>, <text>, <use>, …
+    }>;
+}
+```
+
+### JSON File format example
+
+A JSON document that mirrors SVG structure. The player constructs the SVG DOM and drives the animation at runtime. All animation data, structure, and metadata live in one file.
+
+Two modes share the same root document type (`PxAnimatedSvgDocument`):
+- **Mode A** — `children` present: player renders the element tree and animates it.
+- **Mode B** — no `children`: player animates a pre-existing SVG DOM via `animator.animate`.
+
+**Quick example:**
 
 ```json
 {
@@ -157,21 +243,131 @@ A JSON document that closely mirrors SVG structure, with animation keyframes and
       "type": "ellipse",
       "fill": "#007fff85",
       "stroke": "#003a73",
-      "transform": "translate(139.6604, 163.8499)",
+      "rx": 64, "ry": 64,
       "animate": {
         "translate": {
           "keyframes": [
-            { "t": 0, "v": [139.6604, 163.8499] },
-            { "t": 1000, "v": [139.6604, 310.3879] }
+            { "t": 0,    "v": [139, 163] },
+            { "t": 1000, "v": [139, 310] }
           ]
         }
-      },
-      "rx": 64.0253,
-      "ry": 64.0253
+      }
     }
   ]
 }
 ```
+
+#### Full example — Mode A (all animation types)
+
+```typescript
+const doc = {
+    type: 'svg',
+    id: '_px_root',
+    viewBox: '0 0 600 400',
+
+    animator: {
+        duration: 2000,
+        iterations: 'infinite',
+        fill: 'forwards',
+        direction: 'alternate',
+        mode: 'auto',
+        trigger: { startOn: 'load', outAction: 'pause' },
+        definitions: {
+            easings: {
+                smooth: [0.42, 0, 0.58, 1],  // name → [x1,y1,x2,y2]
+            },
+            animations: {
+                fadeIn: { opacity: { keyframes: [{ t: 0, v: 0 }, { t: 2000, v: 1 }] } },
+            },
+        },
+    },
+
+    children: [
+
+        // opacity — number; named ref from definitions.animations
+        {
+            type: 'rect',
+            x: 40, y: 40, width: 120, height: 90, rx: 8, fill: '#6366f1',
+            animate: 'fadeIn',
+        },
+
+        // fill — color; inline keyframes with named easing ref
+        {
+            type: 'ellipse',
+            cx: 260, cy: 95, rx: 80, ry: 55, fill: '#3b82f6',
+            animate: {
+                fill: {
+                    keyframes: [
+                        { t: 0,    v: '#3b82f6' },
+                        { t: 2000, v: '#ec4899', e: 'smooth' },
+                    ],
+                },
+            },
+        },
+
+        // translate + scale + rotate
+        // one CSS transform fn per nesting level — compose by nesting, not by listing
+        {
+            type: 'g',
+            animate: { translate: { keyframes: [{ t: 0, v: [460, 90] }, { t: 2000, v: [540, 90] }] } },
+            children: [{
+                type: 'g',
+                animate: {
+                    scale: {
+                        keyframes: [
+                            { t: 0,    v: [1,   1  ] },
+                            { t: 1000, v: [1.3, 1.3] },
+                            { t: 2000, v: [1,   1  ] },
+                        ],
+                        loop: true,  // repeat last segment to fill animator.duration
+                    },
+                },
+                children: [{
+                    type: 'g',
+                    animate: {
+                        rotate: {
+                            keyframes: [{ t: 0, v: 0 }, { t: 1000, v: 360 }],
+                            loop: { segmentCount: 1, before: false, alternate: false },
+                        },
+                    },
+                    children: [{ type: 'rect', x: -22, y: -22, width: 44, height: 44, fill: '#10b981' }],
+                }],
+            }],
+        },
+
+        // path morph — animate 'd'; both values must have identical command structure
+        {
+            type: 'path',
+            fill: '#f59e0b',
+            transform: 'translate(120, 280)',
+            animate: {
+                d: {
+                    keyframes: [
+                        { t: 0,    v: 'M-50,0 L0,-50 L50,0 L0,50 Z'       },
+                        { t: 2000, v: 'M-50,-50 L50,-50 L50,50 L-50,50 Z' },
+                    ],
+                },
+            },
+        },
+
+        // stroke-dasharray — draw-on effect; v is [dash, gap]
+        {
+            type: 'path',
+            stroke: '#ef4444', 'stroke-width': 3, fill: 'none',
+            d: 'M 240 260 C 320 180 400 340 480 260',
+            animate: {
+                'stroke-dasharray': {
+                    keyframes: [
+                        { t: 0,    v: [0,   300] },
+                        { t: 2000, v: [300, 300] },
+                    ],
+                },
+            },
+        },
+    ],
+};
+```
+
 
 ### SVG File overview
 
@@ -208,26 +404,77 @@ Same as above, plus a small `<script>` fragment to start/stop the animation on e
 </svg>
 ```
 
-#### **JSON + JavaScript animation** 
-Animation driven entirely by `@pixodesk/svg-animator-web`, bundled into a `<script>` tag. Supports all animation types including shape morphing. Uses the Web Animations API (WAAPI) or `requestAnimationFrame` under the hood.
+#### **SVG + JavaScript animation (Mode B)**
 
-```svg
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="...">
-  <g id="_px_2s60omse" transform="translate(...)">
-    <ellipse id="_px_2s60omsd" fill="#0087ff" ... />
+Static SVG markup with `@pixodesk/svg-animator-web` bundled in a `<script>` tag. The player targets existing DOM elements by `id`. Supports all animation types including shape morphing. Uses WAAPI or `requestAnimationFrame`.
+
+The `data` object passed to `createAnimator` is the same `PxAnimatedSvgDocument` type as the JSON format — without `children`. All animation config lives in `animator.definitions` (named easings and animations) and `animator.animate` (element ID → animation spec map).
+
+```xml
+<!-- static markup; player targets elements by id -->
+<svg id="_px_root" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+
+  <!-- opacity; starts transparent, animated to visible -->
+  <rect id="_px_rect" x="30" y="30" width="120" height="80"
+        rx="8" fill="#6366f1" opacity="0" />
+
+  <!-- fill color + slide-in from left -->
+  <ellipse id="_px_ellipse" cx="260" cy="70" rx="80" ry="50" fill="#3b82f6" />
+
+  <!-- scale loop + translate; children at origin so scale-origin is correct -->
+  <g id="_px_group" transform="translate(90,260)">
+    <rect x="-40" y="-30" width="80" height="60" rx="6" fill="#a855f7" />
   </g>
+
+  <!-- rotate loop; transform-box ensures rotation around own center -->
+  <g id="_px_icon" transform="translate(260,260)"
+     style="transform-box:fill-box;transform-origin:center">
+    <rect x="-25" y="-25" width="50" height="50" rx="4" fill="#10b981" />
+  </g>
+
+  <!-- path morph; same command count/structure in both keyframe values -->
+  <path id="_px_morph" fill="#ec4899" transform="translate(420,260)"
+        d="M-50,0 L0,-50 L50,0 L0,50 Z" />
+
+  <!-- draw-on; starts hidden via stroke-dasharray -->
+  <path id="_px_path" stroke="#ef4444" stroke-width="3" fill="none"
+        stroke-dasharray="0 300"
+        d="M 30 360 C 130 290 230 420 330 350 C 430 280 530 390 570 340" />
+
   <script data-px-script="true">
-    var a = PixodeskAnimator.createAnimator({
-      "defs": {
-        "animations": {
-          "0": { "translate": { "keyframes": [
-            {"t": 0, "v": [200.1185, 41.3612], "e": [0.3333, ...]},
-            {"t": 1000, "v": [200.1185, 41.3612]}
-          ]}}
+    var a = PixodeskAnimator.createAnimator({ data: {
+        type: 'svg',
+        id: '_px_root',
+        animator: {
+            duration: 2000,
+            iterations: 'infinite',
+            fill: 'forwards',
+            mode: 'auto',
+            trigger: { startOn: 'load', outAction: 'pause' },
+            definitions: {
+                easings: {
+                    smooth: [0.42, 0, 0.58, 1],
+                },
+                animations: {
+                    fadeIn:     { opacity:            { keyframes: [{ t: 0, v: 0 }, { t: 2000, v: 1 }] } },
+                    colorShift: { fill:               { keyframes: [{ t: 0, v: '#3b82f6' }, { t: 2000, v: '#ec4899', e: 'smooth' }] } },
+                    slideIn:    { translate:          { keyframes: [{ t: 0, v: [-80, 0] }, { t: 2000, v: [0, 0] }] } },
+                    pulse:      { scale:              { keyframes: [{ t: 0, v: [1, 1] }, { t: 1000, v: [1.2, 1.2] }, { t: 2000, v: [1, 1] }], loop: true } },
+                    spin:       { rotate:             { keyframes: [{ t: 0, v: 0 }, { t: 1000, v: 360 }], loop: { segmentCount: 1, before: false, alternate: false } } },
+                    morph:      { d:                  { keyframes: [{ t: 0, v: 'M-50,0 L0,-50 L50,0 L0,50 Z' }, { t: 2000, v: 'M-50,-50 L50,-50 L50,50 L-50,50 Z' }] } },
+                    draw:       { 'stroke-dasharray': { keyframes: [{ t: 0, v: [0, 300] }, { t: 2000, v: [300, 300] }] } },
+                },
+            },
+            animate: {
+                _px_rect:    'fadeIn',                   // single named ref
+                _px_ellipse: ['colorShift', 'slideIn'],  // array of refs
+                _px_group:   ['pulse', { translate: { keyframes: [{ t: 0, v: [0, 0] }, { t: 2000, v: [40, 0] }] } }], // mixed
+                _px_icon:    'spin',
+                _px_morph:   'morph',
+                _px_path:    'draw',
+            },
         },
-        "bindings": [{"id": "_px_2s60omse", "animate": ...}]
-      }
-    });
+    }});
   </script>
 </svg>
 ```

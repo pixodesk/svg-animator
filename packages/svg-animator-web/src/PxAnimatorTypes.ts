@@ -561,13 +561,11 @@ export interface _PxSvgNode extends PxNode {
 
     /** Global animation configuration */
     animator?: PxAnimatorConfig;
-
-    design?: PxNode;
 }
 
 /**
  * Extra fields present on the root SVG node, on top of PxNode.
- * Excludes `design` (circular reference to PxNode). Used for type extraction via PxInfer.
+ * Used for type extraction via PxInfer.
  *
  * `{ width?:number, height?:number, viewBox?:string, animator?:AnimatorConfig }`
  */
@@ -581,11 +579,9 @@ export const PxSvgNodeExtra = px.object({
 /**
  * Root SVG element containing the entire animated graphic.
  * Extends PxNode (inheriting the open index signature) plus schema-derived
- * SVG-root fields. Only `design` is declared manually due to the circular
- * PxNode reference.
+ * SVG-root fields.
  */
 export interface PxSvgNode extends PxNode, PxInfer<typeof PxSvgNodeExtra> {
-    design?: PxNode;
 }
 
 
@@ -598,14 +594,13 @@ export interface PxSvgNode extends PxNode, PxInfer<typeof PxSvgNodeExtra> {
  * This is the root type for the entire file format.
  *
  * `{ type:'svg', animate?:ElementAnimation, style?:…, width?:number, height?:number,
- *    viewBox?:string, animator?:AnimatorConfig, children?:PxNode[], design?:PxNode }`
+ *    viewBox?:string, animator?:AnimatorConfig, children?:PxNode[] }`
  */
 export const PxAnimatedSvgDocumentSchema = px.object({
     ...PxNodeBase._shape,
     ...PxSvgNodeExtra._shape,
     type: px.literal('svg'),     // override string → literal to require 'svg'
-    children: px.array(PxNodeSchema).optional(),
-    design: PxNodeSchema.optional(),
+    children: px.array(PxNodeSchema).optional()
 });
 
 /**
