@@ -254,6 +254,66 @@ type UnionMembers<T extends ReadonlyArray<PxSchema<any, any>>> =
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DiscriminatedUnion — routes by a literal key field, not first-match order
+// ─────────────────────────────────────────────────────────────────────────────
+
+type AnyDiscriminantShape<K extends string> = Record<K, PxSchema<string | number | boolean, any>>;
+
+/**
+ * Reads `raw[key]`, finds the member schema whose literal matches that value,
+ * then delegates sanitize/isValid to that member. Falls back to the first
+ * member for sanitize when no match is found.
+ */
+class DiscriminatedUnion<T> extends Base<T> {
+    readonly _default: T;
+    private readonly _map: Map<string | number | boolean, PxSchema<T>>;
+
+    constructor(
+        private readonly _key: string,
+        private readonly _schemas: ReadonlyArray<PxSchema<T> & { readonly _shape: AnyDiscriminantShape<string> }>,
+        defaultVal?: T
+    ) {
+        super();
+        this._default = defaultVal ?? _schemas[0]._default;
+        this._map = new Map();
+        for (const s of _schemas) {
+            const keySchema = s._shape[_key];
+            if (keySchema) this._map.set(keySchema._default, s);
+        }
+    }
+
+    private _findSchema(raw: unknown): PxSchema<T> | undefined {
+        if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+        const val = (raw as Record<string, unknown>)[this._key];
+        if (val === undefined || val === null) return undefined;
+        return this._map.get(val as string | number | boolean);
+    }
+
+    sanitize(raw: unknown): T {
+        return (this._findSchema(raw) ?? this._schemas[0]).sanitize(raw);
+    }
+
+    isValid(raw: unknown, ctx?: PxValidationContext, path?: Array<string>): boolean {
+        const schema = this._findSchema(raw);
+        if (!schema) {
+            const val = (raw !== null && typeof raw === 'object' && !Array.isArray(raw))
+                ? (raw as Record<string, unknown>)[this._key] : undefined;
+            ctx?.errors.push(pathStr(path ?? []) + ': no discriminated union member matched '
+                + this._key + '=' + JSON.stringify(val));
+            return false;
+        }
+        return schema.isValid(raw, ctx, path);
+    }
+
+    override _canSanitize(raw: unknown): boolean {
+        if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return false;
+        const schema = this._findSchema(raw);
+        return schema ? schema._canSanitize(raw) : this._schemas[0]._canSanitize(raw);
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Object — strips unknown keys; required fields use default, optional → undefined
 // _canSanitize: true when raw is a plain (non-array) object
 // ─────────────────────────────────────────────────────────────────────────────
@@ -646,6 +706,18 @@ export const px = {
         defaultVal?: UnionMembers<T>
     ): PxSchema<UnionMembers<T>> =>
         new Union(schemas as any, defaultVal) as any,
+
+    /**
+     * Discriminated union — reads `raw[key]`, finds the member schema whose
+     * literal at `key` matches, then delegates sanitize/isValid to that member.
+     * Each member must be an object schema with a `px.literal(...)` at `key`.
+     * TypeScript infers the union of all member types automatically.
+     */
+    discriminatedUnion: <
+        K extends string,
+        T extends ReadonlyArray<PxSchema<any, any> & { readonly _shape: Record<K, PxSchema<string | number | boolean, any>> }>
+    >(key: K, schemas: T): PxSchema<UnionMembers<T>> =>
+        new DiscriminatedUnion(key, schemas as any) as any,
 
     /** Typed object — unknown keys are stripped. Required fields fall back to their default. */
     object: <S extends AnyShape>(shape: S): PxSchema<InferShape<S>> & { readonly _shape: S } =>
