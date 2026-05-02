@@ -517,7 +517,7 @@ export const PxNodeBase = px.openObject({
     animate: PxElementAnimationSchema.optional(),
     meta: px.any().optional(),
     style: px.union([px.string(), px.record(px.union([px.string(), px.number()]))]).optional(),
-});
+}, px.union([px.string(), px.number()]));
 
 // `let` so the lazy closure can capture the variable reference after assignment.
 // By the time the lazy resolves (first isValid/sanitize call), PxNodeSchema is assigned.
@@ -525,7 +525,7 @@ export const PxNodeBase = px.openObject({
 let PxNodeSchema: PxSchema<any> = px.openObject({
     ...PxNodeBase._shape,
     children: px.lazy(() => px.array(PxNodeSchema), []).optional(),
-});
+}, px.union([px.string(), px.number()]));
 export { PxNodeSchema };
 
 /**

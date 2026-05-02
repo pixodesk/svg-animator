@@ -312,31 +312,37 @@ class Obj<S extends AnyShape> extends Base<InferShape<S>> {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OpenObj — like Obj but passes unknown keys through unchanged.
-// Known keys are validated/sanitized; extra keys are kept as-is.
-// Inferred type: InferShape<S> & { [key: string]: any }.
+// OpenObj — like Obj but passes unknown keys through unchanged (or validates/sanitizes
+// them against an optional open-value schema).
+// Known keys are validated/sanitized; unknown keys are passed through as-is when no
+// open schema is given, or validated/sanitized against the open schema when one is provided.
+// Inferred type: InferShape<S> & { [key: string]: V } where V defaults to any.
 // Note: TypeScript intersection semantics mean named-property access on the
 // derived type yields `any` rather than the specific declared type. For
 // type-precise access keep a hand-written interface alongside the schema.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type InferOpenShape<S extends AnyShape> = InferShape<S> & { [key: string]: any };
+type InferOpenShape<S extends AnyShape, _V = any> = InferShape<S> & { [key: string]: any };
 
 /**
  * Open object schema; validates/repairs known keys, passes unknown keys through unchanged.
  * Use when the object may carry arbitrary extra properties (e.g. SVG element attributes).
+ *
+ * @param shape        Known key schemas (validated and type-inferred).
+ * @param openSchema   Optional schema applied to every unknown key's value.
+ *                     When omitted, unknown values are passed through as-is (`any`).
  */
-class OpenObj<S extends AnyShape> extends Base<InferOpenShape<S>> {
-    readonly _default: InferOpenShape<S>;
+class OpenObj<S extends AnyShape, V = any> extends Base<InferOpenShape<S, V>> {
+    readonly _default: InferOpenShape<S, V>;
 
-    constructor(readonly _shape: S) {
+    constructor(readonly _shape: S, private readonly _openSchema?: PxSchema<V>) {
         super();
         const d: any = {};
         for (const key of Object.keys(_shape)) d[key] = _shape[key]._default;
         this._default = d;
     }
 
-    sanitize(raw: unknown): InferOpenShape<S> {
+    sanitize(raw: unknown): InferOpenShape<S, V> {
         const src: Record<string, unknown> = (raw && typeof raw === 'object' && !Array.isArray(raw))
             ? raw as Record<string, unknown>
             : {};
@@ -344,7 +350,12 @@ class OpenObj<S extends AnyShape> extends Base<InferOpenShape<S>> {
         for (const key of Object.keys(this._shape)) {
             out[key] = this._shape[key].sanitize(src[key]);
         }
-        return out as InferOpenShape<S>;
+        if (this._openSchema) {
+            for (const key of Object.keys(src)) {
+                if (!(key in this._shape)) out[key] = this._openSchema.sanitize(src[key]);
+            }
+        }
+        return out as InferOpenShape<S, V>;
     }
 
     isValid(raw: unknown, ctx?: PxValidationContext, path?: Array<string>): boolean {
@@ -359,6 +370,14 @@ class OpenObj<S extends AnyShape> extends Base<InferOpenShape<S>> {
             p.push(key);
             if (!this._shape[key].isValid(obj[key], ctx, p)) ok = false;
             p.pop();
+        }
+        if (this._openSchema) {
+            for (const key of Object.keys(obj)) {
+                if (key in this._shape) continue;
+                p.push(key);
+                if (!this._openSchema.isValid(obj[key], ctx, p)) ok = false;
+                p.pop();
+            }
         }
         return ok;
     }
@@ -632,9 +651,15 @@ export const px = {
     object: <S extends AnyShape>(shape: S): PxSchema<InferShape<S>> & { readonly _shape: S } =>
         new Obj(shape),
 
-    /** Open object — validates known keys, passes unknown keys through unchanged. */
-    openObject: <S extends AnyShape>(shape: S): PxSchema<InferOpenShape<S>> & { readonly _shape: S } =>
-        new OpenObj(shape),
+    /**
+     * Open object — validates known keys; passes unknown keys through as-is,
+     * or validates/sanitizes them against `openSchema` when provided.
+     */
+    openObject: <S extends AnyShape, V = any>(
+        shape: S,
+        openSchema?: PxSchema<V>
+    ): PxSchema<InferOpenShape<S, V>> & { readonly _shape: S } =>
+        new OpenObj(shape, openSchema) as any,
 
     /**
      * Creates a new closed object schema by merging a base schema's shape with additional fields.
