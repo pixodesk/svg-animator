@@ -3,7 +3,7 @@
  * Licensed under the MIT License. See the LICENSE file in the project root for details.
  *---------------------------------------------------------------------------------------*/
 
-import type { PxBezierPath } from './PxAnimatorTypes';
+import type { PxBezierPath, PxTransformParts } from './PxAnimatorTypes';
 
 
 /**
@@ -392,6 +392,42 @@ export function parseColor(s: any): number[] | undefined {
 export const COLOUR_ATTR_NAMES = new Set(["color", "fill", "flood-color", "lighting-color", "stop-color", "stroke"]);
 export const TRANSFORM_FN_NAMES = new Set(["translate", "rotate", "scale", "skew"]);
 export const PCT_BASED_ATTR_NAMES = new Set(["offset-distance", "offsetDistance"]);
+
+/**
+ * Compose a `PxTransformParts` record into a single SVG/CSS transform string in
+ * the canonical order:
+ *
+ *   translate, translate(+origin), rotate, scale, translate(-origin)
+ *
+ * Each part is omitted when not present. `origin` becomes a `translate(+o)` /
+ * `translate(-o)` pair surrounding the rotate/scale segment — the SVG-native
+ * way to render a transform-origin pivot.
+ *
+ * @param parts the parts record (translate / rotate / scale / origin)
+ * @param opts.withUnits  when true (default), translates use `px` and rotate
+ *   uses `deg` — required for CSS / WebAnimations keyframes. When false, no
+ *   units are emitted — required for the SVG `transform` attribute.
+ */
+export function composeTransformParts(
+    parts: PxTransformParts | null | undefined,
+    opts?: { withUnits?: boolean }
+): string {
+    if (!parts) return '';
+    const withUnits = opts?.withUnits ?? true;
+    const segs: Array<string> = [];
+    const t = parts.translate;
+    const o = parts.origin;
+    const r = parts.rotate;
+    const s = parts.scale;
+    const tu = withUnits ? 'px' : '';
+    const ru = withUnits ? 'deg' : '';
+    if (t) segs.push('translate(' + t[0] + tu + ',' + t[1] + tu + ')');
+    if (o) segs.push('translate(' + o[0] + tu + ',' + o[1] + tu + ')');
+    if (r !== undefined && r !== null) segs.push('rotate(' + r + ru + ')');
+    if (s) segs.push('scale(' + s[0] + ',' + s[1] + ')');
+    if (o) segs.push('translate(' + (-o[0]) + tu + ',' + (-o[1]) + tu + ')');
+    return segs.join('');
+}
 export const STYLE_ATTR_NAMES = new Set(["offset-distance", "offsetDistance"]); // Props that need to go to style
 export const DEFAULT_DURATION_MS = 1000;
 

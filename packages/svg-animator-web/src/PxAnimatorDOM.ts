@@ -4,7 +4,7 @@
  *---------------------------------------------------------------------------------------*/
 
 import { getDefs, INTERNAL_ATTRS, TEXT_ATTR, TEXT_CONTENT_ATTR, type PxAnimatedSvgDocument, type PxDefs, type PxNode } from './PxAnimatorTypes';
-import { camelCaseToKebabWordIfNeeded, COLOUR_ATTR_NAMES, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
+import { camelCaseToKebabWordIfNeeded, COLOUR_ATTR_NAMES, composeTransformParts, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
 
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -207,6 +207,13 @@ export function getNormalizedProps(props: Record<string, any>) {
 
         if (COLOUR_ATTR_NAMES.has(key) && Array.isArray(value)) {
             propsCopy[key] = toRGBA(value);
+        } else if (
+            key === 'transform' && value !== null && typeof value === 'object' &&
+            !Array.isArray(value) && value.value && typeof value.value === 'object'
+        ) {
+            // Unified transform structured-static form: { value: PxTransformParts }.
+            // Compose into an SVG transform string (no units — SVG transform attribute).
+            propsCopy['transform'] = composeTransformParts(value.value, { withUnits: false });
         } else if (TRANSFORM_FN_NAMES.has(key)) {
             if (Array.isArray(value)) {
                 if (key === 'translate') value = value.map((v: number) => v + 'px');

@@ -219,6 +219,86 @@ const _ck_PxPropertyAnimation: KeysMatch<PxPropertyAnimation, _PxPropertyAnimati
 
 
 // ============================================================================
+// TRANSFORM
+// ============================================================================
+
+/**
+ * Names of the transform parts that can appear inside a transform value record.
+ * The unified `transform` slot replaces the earlier per-part top-level keys
+ * (`translate`, `rotate`, `scale`, `origin`) — those names now live as keys
+ * inside a `PxTransformParts` record.
+ */
+export const PX_TRANSFORM_PART_KEYS = ['translate', 'rotate', 'scale', 'origin'] as const;
+
+/** One of the transform-part key strings. */
+export type PxTransformPartKey = typeof PX_TRANSFORM_PART_KEYS[number];
+
+/**
+ * Record of transform parts forming a single transform `value`. Each present
+ * key contributes one segment of the composed CSS transform string at render /
+ * interpolation time, in the canonical order
+ * `translate, translate(+origin), rotate, scale, translate(-origin)`.
+ *
+ * `origin` is meaningful only when `rotate` or `scale` is also present in the
+ * same record — see "When does origin belong inside a keyframe value?" in
+ * `file-format-remaining-design-issues2.md`.
+ */
+export interface _PxTransformParts {
+
+    /** Translation offset `[x, y]` in user units. */
+    translate?: [number, number];
+
+    /** Rotation in degrees. */
+    rotate?: number;
+
+    /** Scale factor `[sx, sy]`. */
+    scale?: [number, number];
+
+    /**
+     * Pivot for rotate / scale `[x, y]`. Only meaningful alongside `rotate` or
+     * `scale` in the same record.
+     */
+    origin?: [number, number];
+}
+
+// `{ translate?:[x,y], rotate?:deg, scale?:[sx,sy], origin?:[x,y] }`
+export const PxTransformPartsSchema = implementsInterface<_PxTransformParts>()(px.object({
+    translate: px.tuple([px.number(), px.number()] as const).optional(),
+    rotate: px.number().optional(),
+    scale: px.tuple([px.number(), px.number()] as const).optional(),
+    origin: px.tuple([px.number(), px.number()] as const).optional(),
+}));
+
+/** Record of transform parts forming a single transform `value`. */
+export type PxTransformParts = PxInfer<typeof PxTransformPartsSchema>;
+const _ck_PxTransformParts: KeysMatch<PxTransformParts, _PxTransformParts> = true; // the key sets are identical
+
+/**
+ * Unified `transform` slot value. Three valid shapes:
+ *
+ * - **SVG transform string** — `"translate(10,10)rotate(45)scale(2,2)"`. What
+ *   plain renderers consume directly.
+ * - **Structured static** — `{value: PxTransformParts}`. Parametric record;
+ *   parts stay independently addressable.
+ * - **Animated** — `{keyframes: [{time, value: PxTransformParts, …}, …]}`.
+ *   Each keyframe's `value` is a parts record. The interpolator composes the
+ *   parts into a single transform string per frame.
+ *
+ * Replaces the earlier convention of putting each animated transform part
+ * under its own top-level attribute name (`translate`, `rotate`, `scale`,
+ * `origin`).
+ */
+export const PxTransformValueSchema = px.union([
+    px.string(),
+    px.object({ value: PxTransformPartsSchema }),
+    PxPropertyAnimationSchema,
+]);
+
+/** Unified `transform` slot value: string | structured static | animated. */
+export type PxTransformValue = PxInfer<typeof PxTransformValueSchema>;
+
+
+// ============================================================================
 // ANIMATION DEFINITION
 // ============================================================================
 
@@ -478,19 +558,25 @@ const _ck_PxBinding: KeysMatch<PxBinding, _PxBinding> = true; // the key sets ar
 /**
  * Per-attribute value shape on the element body. A property key carries either:
  * - a primitive (string/number) — static SVG attribute
- * - a {keyframes}/{kfs} object — inline property animation (in-place)
+ * - a `{value: …}` object — structured static parametric source (record-shaped
+ *   static value, used by attributes whose static representation is itself a
+ *   record — notably `transform: {value: PxTransformParts}`)
+ * - a `{keyframes}` / `{kfs}` object — inline property animation
  *
- * Static parametric sources (`{value: …}`) live only inside `meta.attributes`,
- * not on the element body, so the player schema does not include them here.
+ * The unified rule (primitive | `{value}` | `{keyframes}`) applies across the
+ * format. For most attributes the `{value}` form is rarely used on the body
+ * (a primitive suffices for static); for `transform` it is the canonical
+ * structured-static shape. See `PxTransformValueSchema`.
  */
 export const PxAttrValueSchema = px.union([
     px.string(),
     px.number(),
+    px.object({ value: px.any() }),
     PxPropertyAnimationSchema,
 ]);
 
-/** Per-attribute value: primitive for static, PxPropertyAnimation for animated. */
-export type PxAttrValue = string | number | PxPropertyAnimation;
+/** Per-attribute value: primitive for static, `{value}` for structured static, `PxPropertyAnimation` for animated. */
+export type PxAttrValue = string | number | { value: any } | PxPropertyAnimation;
 
 
 /**

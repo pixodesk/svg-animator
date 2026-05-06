@@ -6,7 +6,7 @@
 import { getSelector } from './PxAnimatorFrameLoop';
 import { setupAnimationTriggers } from './PxAnimatorTriggers';
 import { getAnimatorConfig, PxAnimatedSvgDocument, PxAnimatorConfig, PxKeyframe, type PxAnimationDefinition, type PxAnimatorAPI, type PxAnimatorCallbacksConfig } from './PxAnimatorTypes';
-import { clamp, COLOUR_ATTR_NAMES, cubicBezier, kebabToCamelCaseWord, splitEasing, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
+import { clamp, COLOUR_ATTR_NAMES, composeTransformParts, cubicBezier, kebabToCamelCaseWord, splitEasing, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
 import { getNormalisedBindings, interpolateValue } from './PxDefinitions';
 
 
@@ -37,6 +37,11 @@ function createCssKf(kf: PxKeyframe, t: number, propName: string, unsupportedSet
 
     if (COLOUR_ATTR_NAMES.has(propName) && Array.isArray(value)) {
         cssValue = toRGBA(value);
+    } else if (propName === 'transform' && value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        // Unified transform: keyframe value is a parts record (PxTransformParts).
+        // Compose all present parts into one CSS transform string.
+        cssValue = composeTransformParts(value, { withUnits: true });
+        cssKey = 'transform';
     } else if (TRANSFORM_FN_NAMES.has(propName)) {
         if (Array.isArray(value)) {
             if (propName === 'translate') value = value.map(v => v + 'px');

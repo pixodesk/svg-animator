@@ -10,6 +10,7 @@ export type { KeysMatch, PxInfer, PxSchema, PxSchemaDesc, PxValidationContext, R
 
 export type { PxAnimatorOptions } from './PxAnimator';
 export {
+    PX_TRANSFORM_PART_KEYS,
     PxAnimatedSvgDocumentSchema,
     PxAnimationDefinitionSchema,
     PxAnimatorConfigSchema,
@@ -25,6 +26,8 @@ export {
     PxNodeSchema,
     PxPropertyAnimationSchema,
     PxSvgNodeExtra,
+    PxTransformPartsSchema,
+    PxTransformValueSchema,
     PxTriggerSchema
 } from './PxAnimatorTypes';
 
@@ -45,6 +48,9 @@ export type {
     PxNode,
     PxPropertyAnimation,
     PxSvgNode,
+    PxTransformPartKey,
+    PxTransformParts,
+    PxTransformValue,
     PxTrigger,
     PxValidationResult,
     StartOn

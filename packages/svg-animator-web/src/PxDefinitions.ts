@@ -17,9 +17,10 @@ import {
     type PxKeyframe,
     type PxLoop,
     type PxNode,
-    type PxPropertyAnimation
+    type PxPropertyAnimation,
+    type PxTransformParts
 } from './PxAnimatorTypes';
-import { bezierToSvgPath, camelCaseToKebabWordIfNeeded, clamp, COLOUR_ATTR_NAMES, cubicBezier, interpolateBeziers, interpolateColor, interpolateNum, interpolateVec, isCamelCaseWord, parseColor, PCT_BASED_ATTR_NAMES, remap, reverseEasing, splitEasing, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
+import { bezierToSvgPath, camelCaseToKebabWordIfNeeded, clamp, COLOUR_ATTR_NAMES, composeTransformParts, cubicBezier, interpolateBeziers, interpolateColor, interpolateNum, interpolateVec, isCamelCaseWord, parseColor, PCT_BASED_ATTR_NAMES, remap, reverseEasing, splitEasing, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
 
 
 // ============================================================================
@@ -734,6 +735,31 @@ function calcPropertyValue(
             localProgress
         ).join(' ');
         cssAttrName = propName;
+    } else if (
+        cssAttrName === 'transform' &&
+        prevV !== null && typeof prevV === 'object' && !Array.isArray(prevV)
+    ) {
+        // Unified transform: keyframe values are PxTransformParts records.
+        // Interpolate each present part separately, then compose into a transform
+        // string for the SVG `transform` attribute (no units).
+        const partKeys = new Set<string>([
+            ...(prevV ? Object.keys(prevV) : []),
+            ...(nextV ? Object.keys(nextV) : []),
+        ]);
+        const partsResult: PxTransformParts = {};
+        for (const partKey of partKeys) {
+            const prevPart = prevV?.[partKey];
+            const nextPart = nextV?.[partKey];
+            if (partKey === 'rotate') {
+                partsResult.rotate = interpolateNum(+(prevPart ?? 0), +(nextPart ?? 0), localProgress);
+            } else if (partKey === 'translate' || partKey === 'scale' || partKey === 'origin') {
+                const fallback = partKey === 'scale' ? [1, 1] : [0, 0];
+                const interp = interpolateVec(prevPart || fallback, nextPart || fallback, localProgress);
+                (partsResult as any)[partKey] = interp;
+            }
+        }
+        cssValue = composeTransformParts(partsResult, { withUnits: false });
+        cssAttrName = 'transform';
     } else if (cssAttrName === 'translate') {
         const v = interpolateVec(
             prevV || [0, 0],
