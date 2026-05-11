@@ -533,3 +533,197 @@ export function hasStyleProp(
 export function clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(value, max));
 }
+
+
+// ============================================================================
+// 2D CUBIC BÉZIER PRIMITIVES — motion-along-path support
+// ============================================================================
+//
+// Hand-written, dependency-free 2D Bézier maths used by the motion-along-path
+// playback paths (both WAAPI normalisation and frames-mode direct compute).
+// See `fix-motion-along-path--fix-plan.md` for the wider plan.
+//
+// Conventions:
+//   - Points are `[x, y]` tuples (`Point2`) — matches the wire format.
+//   - A cubic segment is `(P0, P1, P2, P3)` where `P0` and `P3` are the
+//     endpoints and `P1`, `P2` are the control points in ABSOLUTE coordinates.
+//   - Editor's tangent storage convention (Lottie-style) is `kf.to` =
+//     outgoing-from-kf-as-a-delta, `kf.ti` = incoming-at-the-next-kf-as-a-delta.
+//     The wire format re-attaches them to the natural endpoints as
+//     `tangentOut` on the FROM keyframe and `tangentIn` on the TO keyframe.
+//     Caller is responsible for the position-to-control-point lift, i.e.
+//     `P1 = fromKf.value + fromKf.tangentOut`, `P2 = toKf.value + toKf.tangentIn`.
+
+
+/**
+ * Evaluate a 2D cubic Bézier at parameter `t ∈ [0, 1]` via Bernstein form:
+ *
+ *   B(t) = (1-t)³ P0 + 3t(1-t)² P1 + 3t²(1-t) P2 + t³ P3
+ *
+ * `t` is the curve PARAMETER, not arc-length. For arc-length (CSS Motion Path
+ * / `offset-distance`) semantics, use `bezier2D_tForDistance` first to convert
+ * a distance to its parameter, then call this. Out-of-range `t` is clamped.
+ */
+export function bezier2D_pointAt(
+    P0: Point2, P1: Point2, P2: Point2, P3: Point2,
+    t: number
+): Point2 {
+    if (t <= 0) return [P0[0], P0[1]];
+    if (t >= 1) return [P3[0], P3[1]];
+    const u = 1 - t;
+    const u2 = u * u;
+    const u3 = u2 * u;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const w0 = u3;
+    const w1 = 3 * t  * u2;
+    const w2 = 3 * t2 * u;
+    const w3 = t3;
+    return [
+        w0 * P0[0] + w1 * P1[0] + w2 * P2[0] + w3 * P3[0],
+        w0 * P0[1] + w1 * P1[1] + w2 * P2[1] + w3 * P3[1],
+    ];
+}
+
+
+/**
+ * Evaluate the derivative `B'(t)` of a 2D cubic Bézier at parameter `t`.
+ *
+ *   B'(t) = 3(1-t)² (P1-P0) + 6t(1-t) (P2-P1) + 3t² (P3-P2)
+ *
+ * Returns the tangent VECTOR (not a unit vector). For auto-orient rotation,
+ * caller computes `Math.atan2(d.y, d.x)`.
+ *
+ * Epsilon-nudge for degenerate endpoints: when a handle coincides with its
+ * endpoint (e.g. `P1 === P0` and `t === 0`, common for the start/end of a
+ * Lottie spatial-tangent path), the derivative collapses to zero. The
+ * exact-endpoint value is then meaningless; we nudge `t` inward by `1e-4`
+ * and retry. This mirrors the editor's `BezierExtra.derivative` workaround.
+ */
+const BEZIER_T_NUDGE = 1e-4;
+export function bezier2D_derivativeAt(
+    P0: Point2, P1: Point2, P2: Point2, P3: Point2,
+    t: number
+): Point2 {
+    const result = _bezier2D_derivativeAtRaw(P0, P1, P2, P3, t);
+    if (result[0] === 0 && result[1] === 0) {
+        // Degenerate (handle = endpoint). Nudge inward and retry.
+        const nudgedT = t < 0.5 ? t + BEZIER_T_NUDGE : t - BEZIER_T_NUDGE;
+        return _bezier2D_derivativeAtRaw(P0, P1, P2, P3, nudgedT);
+    }
+    return result;
+}
+
+function _bezier2D_derivativeAtRaw(
+    P0: Point2, P1: Point2, P2: Point2, P3: Point2,
+    t: number
+): Point2 {
+    const u = 1 - t;
+    const a = 3 * u * u;
+    const b = 6 * t * u;
+    const c = 3 * t * t;
+    return [
+        a * (P1[0] - P0[0]) + b * (P2[0] - P1[0]) + c * (P3[0] - P2[0]),
+        a * (P1[1] - P0[1]) + b * (P2[1] - P1[1]) + c * (P3[1] - P2[1]),
+    ];
+}
+
+
+/**
+ * Arc-length lookup table for a 2D cubic Bézier.
+ *
+ * Samples the curve at `steps + 1` evenly-spaced parameter values
+ * (`t = 0, 1/steps, 2/steps, …, 1`), computes the cumulative Euclidean
+ * distance between consecutive samples, and returns parallel
+ * `Float64Array`s for parameter (`ts`) and arc length (`ds`). `ds[steps]`
+ * is the total arc length of the curve.
+ *
+ * The LUT shape is `{ts, ds}` with parallel Float64Arrays rather than
+ * `Array<{t, d}>` because:
+ *  - One contiguous allocation per array instead of `steps+1` objects.
+ *  - Binary search in `bezier2D_tForDistance` reads `Float64Array` directly.
+ *  - The structure is read-only after construction — no need for per-sample
+ *    field access.
+ *
+ * Approximation error is roughly `O((1/steps)²)` for smooth curves; the
+ * default 100 samples gives <1% error vs analytic arc length on typical
+ * motion paths and matches the editor's `BezierExtra.getDLut` step count.
+ */
+export interface ArcLengthLUT {
+    readonly ts: Float64Array;
+    readonly ds: Float64Array;
+}
+
+export function bezier2D_arcLengthLUT(
+    P0: Point2, P1: Point2, P2: Point2, P3: Point2,
+    steps: number = 100
+): ArcLengthLUT {
+    const n = steps + 1;
+    const ts = new Float64Array(n);
+    const ds = new Float64Array(n);
+
+    let prev = bezier2D_pointAt(P0, P1, P2, P3, 0);
+    ts[0] = 0;
+    ds[0] = 0;
+
+    let cum = 0;
+    for (let i = 1; i < n; i++) {
+        const t = i / steps;
+        const cur = bezier2D_pointAt(P0, P1, P2, P3, t);
+        const dx = cur[0] - prev[0];
+        const dy = cur[1] - prev[1];
+        cum += Math.sqrt(dx * dx + dy * dy);
+        ts[i] = t;
+        ds[i] = cum;
+        prev = cur;
+    }
+    return { ts, ds };
+}
+
+
+/**
+ * Inverse of `bezier2D_arcLengthLUT` lookup: given a distance along the
+ * curve, return the curve parameter `t` reached at that distance via
+ * binary search on `lut.ds` + linear interpolation between adjacent
+ * samples.
+ *
+ * Distance is clamped to `[0, lut.ds[last]]`. The returned `t` is in
+ * `[0, 1]`. Pair with `bezier2D_pointAt` to get the point at that
+ * arc-length distance:
+ *
+ *   const t = bezier2D_tForDistance(lut, distance);
+ *   const point = bezier2D_pointAt(P0, P1, P2, P3, t);
+ */
+export function bezier2D_tForDistance(lut: ArcLengthLUT, distance: number): number {
+    const { ts, ds } = lut;
+    const last = ds.length - 1;
+    if (distance <= 0)        return ts[0];
+    if (distance >= ds[last]) return ts[last];
+
+    // Binary search for the upper-bound index `hi` such that ds[hi-1] <= distance < ds[hi].
+    let lo = 1;
+    let hi = last;
+    while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (ds[mid] < distance) lo = mid + 1;
+        else                    hi = mid;
+    }
+    // Linear interpolate between the bracketing samples.
+    const dPrev = ds[hi - 1];
+    const dCur  = ds[hi];
+    const span  = dCur - dPrev;
+    const frac  = span > 0 ? (distance - dPrev) / span : 0;
+    return ts[hi - 1] + frac * (ts[hi] - ts[hi - 1]);
+}
+
+
+/**
+ * `bezier2D_tForDistance` convenience taking a fraction of the total arc
+ * length instead of an absolute distance. `pct` is in `[0, 1]` (CSS Motion
+ * Path `offset-distance` semantics — `offset-distance: 50%` ≡
+ * `bezier2D_tForDistancePct(lut, 0.5)`). Out-of-range values clamp.
+ */
+export function bezier2D_tForDistancePct(lut: ArcLengthLUT, pct: number): number {
+    const total = lut.ds[lut.ds.length - 1];
+    return bezier2D_tForDistance(lut, pct * total);
+}
