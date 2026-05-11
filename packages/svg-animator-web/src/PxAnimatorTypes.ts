@@ -83,9 +83,31 @@ export interface _PxKeyframe {
 
     /** Short alias for "easing" */
     e?: PxEasingOrRef;
+
+    /**
+     * Outgoing spatial tangent `[dx, dy]` for motion-along-path interpolation
+     * (translate animations only).
+     *
+     * Stored as a *delta relative to* this keyframe's translate position —
+     * the cubic Bezier segment between this kf and the next is built from
+     * `(P0=value, P1=value+tangentOut, P2=next.value+next.tangentIn, P3=next.value)`.
+     *
+     * Defined when the segment leaving this keyframe is curved.
+     */
+    tangentOut?: [number, number];
+
+    /**
+     * Incoming spatial tangent `[dx, dy]` for motion-along-path interpolation
+     * (translate animations only). Delta relative to this keyframe's translate
+     * position. See `tangentOut` for the segment construction.
+     *
+     * Defined when the segment arriving at this keyframe is curved.
+     */
+    tangentIn?: [number, number];
 }
 
-// `{ time?:number, t?:number, value?:any, v?:any, easing?:Easing, e?:Easing }`
+// `{ time?:number, t?:number, value?:any, v?:any, easing?:Easing, e?:Easing,
+//    tangentOut?:[dx,dy], tangentIn?:[dx,dy] }`
 export const PxKeyframeSchema = implementsInterface<_PxKeyframe>()(px.object({
     time: px.number().optional(),
     t: px.number().optional(),
@@ -93,6 +115,8 @@ export const PxKeyframeSchema = implementsInterface<_PxKeyframe>()(px.object({
     v: px.any().optional(),
     easing: PxEasingOrRefSchema.optional(),
     e: PxEasingOrRefSchema.optional(),
+    tangentOut: px.tuple([px.number(), px.number()] as const).optional(),
+    tangentIn:  px.tuple([px.number(), px.number()] as const).optional(),
 }));
 
 /** A single animation keyframe defining the state at a specific point in time. */
@@ -204,13 +228,24 @@ export interface _PxPropertyAnimation {
      * interaction between the two.
      */
     loop?: PxLoop | boolean;
+
+    /**
+     * Motion-along-path "auto-orient" flag. Only meaningful for translate
+     * animations whose keyframes carry spatial tangents (`tangentIn` /
+     * `tangentOut`): when true, the element rotates so its local X axis aligns
+     * with the path tangent at the current position. The rotation is computed
+     * from the cubic-Bezier derivative at the eased progress along the
+     * arc-length-parametrised segment.
+     */
+    autoOrient?: boolean;
 }
 
-// `{ keyframes?:Keyframe[], kfs?:Keyframe[], loop?:Loop|boolean }`
+// `{ keyframes?:Keyframe[], kfs?:Keyframe[], loop?:Loop|boolean, autoOrient?:bool }`
 export const PxPropertyAnimationSchema = implementsInterface<_PxPropertyAnimation>()(px.object({
     keyframes: px.array(PxKeyframeSchema).optional(),
     kfs: px.array(PxKeyframeSchema).optional(),
     loop: px.union([PxLoopSchema, px.boolean()]).optional(),
+    autoOrient: px.boolean().optional(),
 }));
 
 /** Animation definition for a single CSS/SVG property. */
