@@ -21,6 +21,7 @@ import {
     type PxTransformParts
 } from './PxAnimatorTypes';
 import { bezierToSvgPath, camelCaseToKebabWordIfNeeded, clamp, COLOUR_ATTR_NAMES, composeTransformParts, cubicBezier, interpolateBeziers, interpolateColor, interpolateNum, interpolateVec, isCamelCaseWord, parseColor, PCT_BASED_ATTR_NAMES, remap, reverseEasing, splitEasing, toRGBA, TRANSFORM_FN_NAMES } from './PxAnimatorUtil';
+import { evaluateMotionPathSegment, propAnimIsMotionPath } from './PxMotionPath';
 
 
 // ============================================================================
@@ -756,6 +757,25 @@ function calcPropertyValue(
                 const fallback = partKey === 'scale' ? [1, 1] : [0, 0];
                 const interp = interpolateVec(prevPart || fallback, nextPart || fallback, localProgress);
                 (partsResult as any)[partKey] = interp;
+            }
+        }
+        // Motion-along-path override: when the animation carries tangents or
+        // `autoOrient`, the translate part follows the 2D cubic Bezier defined
+        // by `kf.tangentOut` / `next.tangentIn`, with arc-length parametrisation.
+        // `autoOrient` injects a rotate derived from the curve tangent.
+        if (propAnimIsMotionPath(propAnim)) {
+            const prevTr = (prevV as any).translate;
+            const nextTr = (nextV as any).translate;
+            if (Array.isArray(prevTr) && Array.isArray(nextTr)) {
+                const sample = evaluateMotionPathSegment(
+                    prevKf, nextKf,
+                    [+prevTr[0], +prevTr[1]],
+                    [+nextTr[0], +nextTr[1]],
+                    localProgress,
+                    !!propAnim.autoOrient,
+                );
+                partsResult.translate = [sample.translate[0], sample.translate[1]];
+                if (sample.rotateDeg !== undefined) partsResult.rotate = sample.rotateDeg;
             }
         }
         cssValue = composeTransformParts(partsResult, { withUnits: false });

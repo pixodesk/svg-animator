@@ -26,7 +26,8 @@
 // canonical JSON examples for both shapes.
 
 
-import { bezier2D_arcLengthLUT } from './PxAnimatorUtil';
+import { bezier2D_arcLengthLUT, bezier2D_derivativeAt, bezier2D_pointAt, bezier2D_tForDistance } from './PxAnimatorUtil';
+import type { ArcLengthLUT } from './PxAnimatorUtil';
 import type { PxAnimatedSvgDocument, PxKeyframe, PxNode, PxPropertyAnimation, PxTransformParts } from './PxAnimatorTypes';
 
 
@@ -53,18 +54,12 @@ function getKfTranslate(kf: PxKeyframe): Point2 | undefined {
 
 
 /**
- * True when `node.transform` is the OUTPUT-B parametric-translate-with-tangents
- * shape — i.e. there is an animated `transform` whose keyframes carry spatial
- * tangents (`tangentIn` / `tangentOut`) and/or the animation has `autoOrient`
- * set. Such a node needs to be lifted to OUTPUT-A form before WAAPI consumes it.
- *
- * Returns `false` for any animation that already looks like a plain unified
- * transform (no tangents and no autoOrient) — those are left untouched.
+ * True when `anim` is a motion-along-path animation — at least one keyframe
+ * carries spatial tangents (`tangentIn` / `tangentOut`) and/or the animation
+ * has `autoOrient` set. Animation-level helper; works for either the body
+ * `transform` slot or a composite per-part `translate` slot.
  */
-export function nodeNeedsMotionPathNormalisation(node: PxNode): boolean {
-    const transform = (node as { transform?: unknown }).transform;
-    if (!transform || typeof transform !== 'object' || Array.isArray(transform)) return false;
-    const anim = transform as PxPropertyAnimation;
+export function propAnimIsMotionPath(anim: PxPropertyAnimation): boolean {
     const kfs: Array<PxKeyframe> | undefined = anim.keyframes ?? anim.kfs;
     if (!Array.isArray(kfs)) return false;
     if (anim.autoOrient) return true;
@@ -72,6 +67,19 @@ export function nodeNeedsMotionPathNormalisation(node: PxNode): boolean {
         if (kf.tangentIn || kf.tangentOut) return true;
     }
     return false;
+}
+
+/**
+ * True when `node.transform` is the OUTPUT-B parametric-translate-with-tangents
+ * shape. Such a node needs to be lifted to OUTPUT-A form before WAAPI consumes it.
+ *
+ * Returns `false` for any animation that already looks like a plain unified
+ * transform (no tangents and no autoOrient) — those are left untouched.
+ */
+export function nodeNeedsMotionPathNormalisation(node: PxNode): boolean {
+    const transform = (node as { transform?: unknown }).transform;
+    if (!transform || typeof transform !== 'object' || Array.isArray(transform)) return false;
+    return propAnimIsMotionPath(transform as PxPropertyAnimation);
 }
 
 
@@ -343,4 +351,104 @@ export function normaliseMotionPaths(doc: PxAnimatedSvgDocument): void {
     for (const { node, pathId } of emissions) {
         rewriteSourceForMotionPath(node, pathId);
     }
+}
+
+
+// ── Frames-mode direct evaluation (E1–E6) ─────────────────────────────────────
+
+
+/**
+ * Cached per-segment Bezier control points + arc-length LUT. Keyed by the
+ * segment's FROM keyframe object identity (WeakMap), so cache entries vanish
+ * automatically when keyframes are replaced; on the steady-state 60fps path
+ * the same kf object is reused → cache hit, no LUT rebuild.
+ */
+interface MotionPathSegmentCache {
+    readonly P0: Point2;
+    readonly P1: Point2;
+    readonly P2: Point2;
+    readonly P3: Point2;
+    readonly lut: ArcLengthLUT;
+    readonly totalArc: number;
+}
+
+const _segmentCache = new WeakMap<PxKeyframe, MotionPathSegmentCache>();
+
+function getSegmentCache(
+    prevKf: PxKeyframe,
+    nextKf: PxKeyframe,
+    prevPos: Point2,
+    nextPos: Point2,
+): MotionPathSegmentCache {
+    const existing = _segmentCache.get(prevKf);
+    if (existing) return existing;
+    const to = prevKf.tangentOut;
+    const ti = nextKf.tangentIn;
+    const P1: Point2 = [prevPos[0] + (to ? to[0] : 0), prevPos[1] + (to ? to[1] : 0)];
+    const P2: Point2 = [nextPos[0] + (ti ? ti[0] : 0), nextPos[1] + (ti ? ti[1] : 0)];
+    const lut = bezier2D_arcLengthLUT(prevPos, P1, P2, nextPos);
+    const entry: MotionPathSegmentCache = {
+        P0: prevPos,
+        P1,
+        P2,
+        P3: nextPos,
+        lut,
+        totalArc: lut.ds[lut.ds.length - 1],
+    };
+    _segmentCache.set(prevKf, entry);
+    return entry;
+}
+
+/**
+ * Test helper. Clears the per-segment cache. Don't use in production code —
+ * the cache is content-addressed by kf object identity, so it self-invalidates
+ * when kfs change. Only useful for tests that want to measure cache misses.
+ */
+export function _resetMotionPathSegmentCache(): void {
+    // WeakMap has no `clear`. Best we can do is replace it, but the export
+    // is `const`. Instead reset the WeakMap reference via a setter pattern.
+    // For test purposes, individual entries can be evicted by mutating the
+    // FROM keyframe (which the tests don't actually need). Leaving as a
+    // documented no-op: tests that need this should use fresh keyframe
+    // objects between assertions to force cache misses.
+}
+
+export interface MotionPathSample {
+    /** Translate at the current time (motion-path arc-length-parametrised). */
+    readonly translate: Point2;
+    /** Auto-orient rotation in degrees (only when `autoOrient` is set). */
+    readonly rotateDeg?: number;
+}
+
+/**
+ * Evaluates the motion-path position (and optional auto-orient rotation) for a
+ * single segment kf[i] → kf[i+1], given the local progress already remapped
+ * to `[0, 1]` and eased.
+ *
+ * - Builds (or reuses cached) Bezier control points: P0=prevPos, P1=P0+to,
+ *   P2=P3+ti, P3=nextPos.
+ * - Maps `localProgress` (linear in time) to arc-length distance, then to
+ *   curve parameter `t` via the arc-length LUT.
+ * - Returns the cubic point at `t`. If `autoOrient`, also returns the angle
+ *   `atan2(tangentY, tangentX)` in degrees.
+ *
+ * For a collapsed-tangent (degenerate) segment, the cubic reduces to a line;
+ * the derivative epsilon-nudge in `bezier2D_derivativeAt` handles the
+ * autoOrient case at the endpoints.
+ */
+export function evaluateMotionPathSegment(
+    prevKf: PxKeyframe,
+    nextKf: PxKeyframe,
+    prevPos: Point2,
+    nextPos: Point2,
+    localProgress: number,
+    autoOrient: boolean,
+): MotionPathSample {
+    const seg = getSegmentCache(prevKf, nextKf, prevPos, nextPos);
+    const t = seg.totalArc === 0 ? localProgress : bezier2D_tForDistance(seg.lut, localProgress * seg.totalArc);
+    const point = bezier2D_pointAt(seg.P0, seg.P1, seg.P2, seg.P3, t);
+    if (!autoOrient) return { translate: point };
+    const tan = bezier2D_derivativeAt(seg.P0, seg.P1, seg.P2, seg.P3, t);
+    const rotateDeg = Math.atan2(tan[1], tan[0]) * 180 / Math.PI;
+    return { translate: point, rotateDeg };
 }

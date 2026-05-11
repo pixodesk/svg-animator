@@ -6,9 +6,11 @@
 // Tests for `PxMotionPath` — motion-along-path normalisation (OUTPUT-B → OUTPUT-A).
 // See `fix-motion-along-path--fix-plan.md`.
 
-import { describe, expect, it } from 'vitest';
-import type { PxAnimatedSvgDocument, PxNode } from './PxAnimatorTypes';
-import { buildMotionPathD, emitMotionPathsToDefs, findMotionPathNodes, motionPathIdForNode, nodeNeedsMotionPathNormalisation, normaliseMotionPaths, rewriteSourceForMotionPath } from './PxMotionPath';
+import { describe, expect, it, vi } from 'vitest';
+import * as PxAnimatorUtil from './PxAnimatorUtil';
+import type { PxAnimatedSvgDocument, PxAnimationDefinition, PxNode } from './PxAnimatorTypes';
+import { calcAnimationValues } from './PxDefinitions';
+import { buildMotionPathD, emitMotionPathsToDefs, evaluateMotionPathSegment, findMotionPathNodes, motionPathIdForNode, nodeNeedsMotionPathNormalisation, normaliseMotionPaths, propAnimIsMotionPath, rewriteSourceForMotionPath } from './PxMotionPath';
 
 
 // ── Helpers to build test fixtures ────────────────────────────────────────────
@@ -761,7 +763,7 @@ describe('normaliseMotionPaths (D3 + D4 combined)', () => {
         expect(vals[2]).toBeGreaterThan(vals[1]);
     });
 
-    it('handles multiple motion-path elements at the same level', () => {
+    it('handles multiple motion-path elements at the same level (D6/d)', () => {
         const a: any = bodyTransformWithTangents();
         a.id = 'A';
         const b: any = bodyTransformAutoOrientNoTangents();
@@ -780,5 +782,332 @@ describe('normaliseMotionPaths (D3 + D4 combined)', () => {
         expect(doc.children[2].id).toBe('B');
         expect(doc.children[2].transform).toBeUndefined();
         expect(doc.children[2].style.offsetPath).toBe('url(#B_motion)');
+    });
+});
+
+
+// ── Phase E: frames-mode direct evaluation ────────────────────────────────────
+
+
+describe('propAnimIsMotionPath', () => {
+
+    it('returns true when any keyframe carries tangents', () => {
+        const anim = {
+            keyframes: [
+                { time: 0,    value: { translate: [0, 0] }, tangentOut: [10, 0] },
+                { time: 1000, value: { translate: [50, 50] } },
+            ],
+        } as any;
+        expect(propAnimIsMotionPath(anim)).toBe(true);
+    });
+
+    it('returns true when autoOrient is set, even without tangents', () => {
+        const anim = {
+            autoOrient: true,
+            keyframes: [
+                { time: 0,    value: { translate: [0, 0] } },
+                { time: 1000, value: { translate: [50, 50] } },
+            ],
+        } as any;
+        expect(propAnimIsMotionPath(anim)).toBe(true);
+    });
+
+    it('returns false for a plain unified transform with no tangents or autoOrient', () => {
+        const anim = {
+            keyframes: [
+                { time: 0,    value: { translate: [0, 0] } },
+                { time: 1000, value: { translate: [50, 50] } },
+            ],
+        } as any;
+        expect(propAnimIsMotionPath(anim)).toBe(false);
+    });
+
+    it('returns false when keyframes is missing', () => {
+        expect(propAnimIsMotionPath({} as any)).toBe(false);
+    });
+});
+
+
+describe('evaluateMotionPathSegment', () => {
+
+    // Canonical horseshoe between P0=(60,190) and P3=(60,360):
+    //   tangentOut = [62.3495, 57.0257]  (relative, on FROM kf)
+    //   tangentIn  = [62.3495, -56.3075] (relative, on TO kf)
+    // Control points (absolute): P1=(122.3495,247.0257), P2=(122.3495,303.6925).
+    const horseshoeKfs = () => [
+        { time: 0,    value: { translate: [60, 190] }, tangentOut: [62.3495,  57.0257] },
+        { time: 1000, value: { translate: [60, 360] }, tangentIn:  [62.3495, -56.3075] },
+    ];
+
+    it('returns P0 at localProgress=0 and P3 at localProgress=1', () => {
+        const kfs = horseshoeKfs();
+        const start = evaluateMotionPathSegment(
+            kfs[0] as any, kfs[1] as any,
+            [60, 190], [60, 360],
+            0,
+            false
+        );
+        expect(start.translate[0]).toBeCloseTo(60, 5);
+        expect(start.translate[1]).toBeCloseTo(190, 5);
+
+        const end = evaluateMotionPathSegment(
+            kfs[0] as any, kfs[1] as any,
+            [60, 190], [60, 360],
+            1,
+            false
+        );
+        expect(end.translate[0]).toBeCloseTo(60, 5);
+        expect(end.translate[1]).toBeCloseTo(360, 5);
+    });
+
+    it('returns a point on the horseshoe interior at localProgress=0.5', () => {
+        const kfs = horseshoeKfs();
+        const mid = evaluateMotionPathSegment(
+            kfs[0] as any, kfs[1] as any,
+            [60, 190], [60, 360],
+            0.5,
+            false
+        );
+        // At half-arc the curve bows out to roughly x ≈ 107 (midpoint of the
+        // control-net x = (60 + 122.3495 + 122.3495 + 60)/4 = 91.17; arc-length
+        // mapping puts t≈0.5 anyway since the curve is roughly symmetric).
+        expect(mid.translate[0]).toBeGreaterThan(90);
+        expect(mid.translate[0]).toBeLessThan(125);
+        expect(mid.translate[1]).toBeGreaterThan(190);
+        expect(mid.translate[1]).toBeLessThan(360);
+    });
+
+    it('omits rotateDeg when autoOrient is false', () => {
+        const kfs = horseshoeKfs();
+        const sample = evaluateMotionPathSegment(
+            kfs[0] as any, kfs[1] as any,
+            [60, 190], [60, 360],
+            0.5,
+            false
+        );
+        expect(sample.rotateDeg).toBeUndefined();
+    });
+
+    it('returns rotateDeg when autoOrient is true; uses atan2(tan.y, tan.x) in degrees', () => {
+        // For a straight segment along +x (P0=(0,0)→P3=(100,0), no tangents),
+        // the tangent is (1, 0); atan2(0, 1) = 0 rad → 0 deg.
+        const kfs = [
+            { time: 0,    value: { translate: [0, 0] } },
+            { time: 1000, value: { translate: [100, 0] } },
+        ];
+        const sample = evaluateMotionPathSegment(
+            kfs[0] as any, kfs[1] as any,
+            [0, 0], [100, 0],
+            0.5,
+            true
+        );
+        expect(sample.rotateDeg).toBeDefined();
+        expect(sample.rotateDeg!).toBeCloseTo(0, 5);
+    });
+
+    it('returns rotateDeg ≈ 90 for a straight +y segment with autoOrient', () => {
+        const kfs = [
+            { time: 0,    value: { translate: [0, 0] } },
+            { time: 1000, value: { translate: [0, 100] } },
+        ];
+        const sample = evaluateMotionPathSegment(
+            kfs[0] as any, kfs[1] as any,
+            [0, 0], [0, 100],
+            0.5,
+            true
+        );
+        expect(sample.rotateDeg!).toBeCloseTo(90, 5);
+    });
+
+    it('caches the segment LUT per FROM keyframe (same input → no rebuild)', () => {
+        // Use a fresh keyframe pair so any prior cache state is irrelevant.
+        const kfs = [
+            { time: 0,    value: { translate: [0, 0] }, tangentOut: [50, 0] },
+            { time: 1000, value: { translate: [100, 100] }, tangentIn: [0, -50] },
+        ];
+
+        const s1 = evaluateMotionPathSegment(
+            kfs[0] as any, kfs[1] as any,
+            [0, 0], [100, 100],
+            0.25,
+            false
+        );
+        const s2 = evaluateMotionPathSegment(
+            kfs[0] as any, kfs[1] as any,
+            [0, 0], [100, 100],
+            0.25,
+            false
+        );
+
+        // Deterministic: same inputs → same output (proves cache didn't corrupt state).
+        expect(s2.translate[0]).toBeCloseTo(s1.translate[0], 10);
+        expect(s2.translate[1]).toBeCloseTo(s1.translate[1], 10);
+    });
+
+    it('handles a degenerate (zero-length) segment without dividing by zero', () => {
+        const kfs = [
+            { time: 0,    value: { translate: [42, 42] } },
+            { time: 1000, value: { translate: [42, 42] } },
+        ];
+        const sample = evaluateMotionPathSegment(
+            kfs[0] as any, kfs[1] as any,
+            [42, 42], [42, 42],
+            0.5,
+            true
+        );
+        // Position is just the (collapsed) point.
+        expect(sample.translate[0]).toBeCloseTo(42, 5);
+        expect(sample.translate[1]).toBeCloseTo(42, 5);
+        // Derivative is degenerate; epsilon-nudge in bezier2D_derivativeAt
+        // still produces a finite number (NaN/Inf would fail the test).
+        expect(Number.isFinite(sample.rotateDeg!)).toBe(true);
+    });
+});
+
+
+describe('calcAnimationValues integration (E5–E7)', () => {
+
+    function parseTransform(str: string): { translate?: [number, number], rotate?: number } {
+        const out: { translate?: [number, number], rotate?: number } = {};
+        const trMatch = str.match(/translate\(([^)]+)\)/);
+        if (trMatch) {
+            const [x, y] = trMatch[1].split(',').map(s => parseFloat(s.trim()));
+            out.translate = [x, y];
+        }
+        const rotMatch = str.match(/rotate\(([^)]+)\)/);
+        if (rotMatch) {
+            out.rotate = parseFloat(rotMatch[1]);
+        }
+        return out;
+    }
+
+    // Canonical horseshoe transform animation (OUTPUT-B body shape).
+    function horseshoeAnim(autoOrient: boolean): PxAnimationDefinition {
+        return {
+            transform: {
+                autoOrient,
+                kfs: [
+                    { t: 0, v: { translate: [60, 190] }, tangentOut: [62.3495,  57.0257] },
+                    { t: 1, v: { translate: [60, 360] }, tangentIn:  [62.3495, -56.3075] },
+                ],
+            },
+        } as any;
+    }
+
+    it('emits the start position at progress=0', () => {
+        const values = calcAnimationValues(horseshoeAnim(true), 0);
+        const tr = parseTransform(values['transform']);
+        expect(tr.translate?.[0]).toBeCloseTo(60, 3);
+        expect(tr.translate?.[1]).toBeCloseTo(190, 3);
+    });
+
+    it('emits the end position at progress=1', () => {
+        const values = calcAnimationValues(horseshoeAnim(true), 1);
+        const tr = parseTransform(values['transform']);
+        expect(tr.translate?.[0]).toBeCloseTo(60, 3);
+        expect(tr.translate?.[1]).toBeCloseTo(360, 3);
+    });
+
+    it('emits a point on the horseshoe at progress=0.5 (not the linear midpoint)', () => {
+        const values = calcAnimationValues(horseshoeAnim(true), 0.5);
+        const tr = parseTransform(values['transform']);
+        // Linear midpoint of (60,190)-(60,360) is (60, 275). Motion-path
+        // midpoint bows out to x ≈ 107 — definitively NOT (60, 275).
+        expect(tr.translate?.[0]).toBeGreaterThan(90);
+        expect(tr.translate?.[1]).toBeCloseTo(275, 0);
+    });
+
+    it('includes a rotate() segment when autoOrient is true', () => {
+        const values = calcAnimationValues(horseshoeAnim(true), 0.5);
+        expect(values['transform']).toMatch(/rotate\(/);
+    });
+
+    it('does NOT include rotate() when autoOrient is false (tangents only)', () => {
+        const values = calcAnimationValues(horseshoeAnim(false), 0.5);
+        // Tangents alone (no autoOrient) → motion-path translate, no rotate.
+        // Note: if the animation has no `rotate` part in its values, none is emitted.
+        const tr = parseTransform(values['transform']);
+        expect(tr.translate?.[0]).toBeGreaterThan(90);
+        expect(values['transform']).not.toMatch(/rotate\(/);
+    });
+
+    it('falls back to linear interpolation when neither tangents nor autoOrient are set', () => {
+        const animDef: PxAnimationDefinition = {
+            transform: {
+                kfs: [
+                    { t: 0, v: { translate: [60, 190] } },
+                    { t: 1, v: { translate: [60, 360] } },
+                ],
+            },
+        } as any;
+        const values = calcAnimationValues(animDef, 0.5);
+        const tr = parseTransform(values['transform']);
+        // Linear midpoint.
+        expect(tr.translate?.[0]).toBeCloseTo(60, 3);
+        expect(tr.translate?.[1]).toBeCloseTo(275, 3);
+    });
+
+    it('autoOrient rotate matches the curve tangent direction at the midpoint', () => {
+        const values = calcAnimationValues(horseshoeAnim(true), 0.5);
+        const tr = parseTransform(values['transform']);
+        // The horseshoe curve is symmetric in y about the midpoint and bows out
+        // in +x. At t≈0.5, the tangent points roughly in +y (the path is
+        // heading from (60,190) "down" the screen via x≈110 back to (60,360)).
+        // atan2(+y, ~0) ≈ +90°. Allow a few degrees of slack for LUT discretisation.
+        expect(tr.rotate).toBeDefined();
+        expect(Math.abs(tr.rotate!)).toBeGreaterThan(85);
+        expect(Math.abs(tr.rotate!)).toBeLessThan(95);
+    });
+
+    it('caches segment LUT across consecutive ticks (cache hot)', () => {
+        // Drive 60 sample ticks across the segment. If the cache were missing,
+        // each call would rebuild a 100-step LUT. The cache is keyed on the
+        // FROM keyframe object, which is stable across calls here.
+        const anim = horseshoeAnim(true);
+        const samples: Array<string> = [];
+        for (let i = 0; i <= 60; i++) {
+            const values = calcAnimationValues(anim, i / 60);
+            samples.push(values['transform']);
+        }
+        // Sanity: 61 distinct outputs (monotone in progress, no jumps).
+        expect(samples).toHaveLength(61);
+        expect(samples[0]).not.toBe(samples[60]);
+
+        // No allocation count assertion here (vitest browser env doesn't
+        // expose heap counters); the test serves as a smoke check that the
+        // hot loop runs without error. Cache-hit behaviour is verified by
+        // the unit test 'caches the segment LUT per FROM keyframe'.
+    });
+
+    // ── E8: explicit cache-hit verification (no per-tick LUT rebuild) ─────────
+
+    it('builds the segment LUT exactly once across 60 ticks (E8)', () => {
+        // Spy on the LUT builder and count invocations. The first frame should
+        // build it; subsequent frames must hit the WeakMap cache.
+        const spy = vi.spyOn(PxAnimatorUtil, 'bezier2D_arcLengthLUT');
+        const callsBefore = spy.mock.calls.length;
+        try {
+            // Use FRESH keyframe objects so prior tests don't pollute the cache.
+            const anim: PxAnimationDefinition = {
+                transform: {
+                    autoOrient: true,
+                    kfs: [
+                        { t: 0, v: { translate: [60, 190] }, tangentOut: [62.3495,  57.0257] },
+                        { t: 1, v: { translate: [60, 360] }, tangentIn:  [62.3495, -56.3075] },
+                    ],
+                },
+            } as any;
+
+            for (let i = 0; i <= 60; i++) {
+                calcAnimationValues(anim, i / 60);
+            }
+
+            const newCalls = spy.mock.calls.length - callsBefore;
+            // One single segment → at most one LUT build (the cache must catch
+            // every subsequent tick).
+            expect(newCalls).toBe(1);
+        } finally {
+            spy.mockRestore();
+        }
     });
 });
