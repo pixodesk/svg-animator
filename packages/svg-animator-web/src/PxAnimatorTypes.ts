@@ -106,8 +106,51 @@ export interface _PxKeyframe {
     tangentIn?: [number, number];
 }
 
+/**
+ * Allowed shapes for a single keyframe `value` across the wire schema:
+ *  - `number`                       — scalar properties (rotate-degree, opacity, offset-distance, …)
+ *  - `Array<number>`                — vector properties (translate `[x,y]`, scale `[sx,sy]`, stroke-dasharray, RGBA …)
+ *  - `string`                       — color (hex / `url(#…)` / named) and other string-valued props
+ *  - `PxTransformParts`             — unified body `transform` parts record
+ *                                     `{translate, rotate, scale, origin}`
+ *  - `{ paths: Array<PxBezierPath> }` — animated SVG path `d` value
+ *
+ * Used as documentation / explicit-validation entry point; `PxKeyframeSchema`
+ * itself stores `value` as `any` to keep downstream interpolator code in
+ * `PxDefinitions.ts` working with duck-typed access (`prevV?.paths`,
+ * `Array.isArray(prevV)`, …) without per-shape narrowing.
+ */
+export type _PxKeyframeValue =
+    | string
+    | number
+    | Array<number>
+    | PxTransformParts
+    | { paths: Array<PxBezierPath> };
+
+// `string | number | Array<number> | PxTransformParts | { paths: BezierPath[] }`
+//
+// `PxTransformPartsSchema` / `PxBezierPathSchema` are declared later in this
+// file — `px.lazy` defers the lookup until validation time so the declarations
+// stay in narrative order without a TDZ at module load.
+export const PxKeyframeValueSchema = implementsInterface<_PxKeyframeValue>()(px.union([
+    px.string(), // e.g. for colors
+    px.number(),
+    px.array(px.number()),
+    px.lazy<PxTransformParts>(() => PxTransformPartsSchema, {}),
+    px.lazy<{ paths: Array<PxBezierPath> }>(() => px.object({ paths: px.array(PxBezierPathSchema) }), { paths: [] }),
+]));
+
+/** A single keyframe `value` — union of all wire-allowed shapes. */
+export type PxKeyframeValue = PxInfer<typeof PxKeyframeValueSchema>;
+
 // `{ time?:number, t?:number, value?:any, v?:any, easing?:Easing, e?:Easing,
 //    tangentOut?:[dx,dy], tangentIn?:[dx,dy] }`
+//
+// `value` / `v` are stored as `px.any()` to match the `_PxKeyframe` interface
+// (`value?: any`) and to keep the inferred `PxKeyframe.value` type permissive
+// for the duck-typed access in `PxDefinitions.ts`. The structured value-shape
+// union is still available via {@link PxKeyframeValueSchema} for callers that
+// want to validate or document the allowed shapes.
 export const PxKeyframeSchema = implementsInterface<_PxKeyframe>()(px.object({
     time: px.number().optional(),
     t: px.number().optional(),
