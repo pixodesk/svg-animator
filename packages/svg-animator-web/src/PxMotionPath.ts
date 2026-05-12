@@ -181,7 +181,7 @@ export function buildMotionPathD(node: PxNode): string | undefined {
  */
 export function motionPathIdForNode(node: PxNode): string {
     const baseId = node.id ?? 'unknown';
-    return `${baseId}_motion`;
+    return baseId + '_motion';
 }
 
 /**
@@ -331,7 +331,7 @@ export function rewriteSourceForMotionPath(node: PxNode, pathId: string): void {
     node.offsetDistance = offsetAnim;
 
     const style = (node.style ?? {}) as Record<string, string>;
-    style.offsetPath = `url(#${pathId})`;
+    style.offsetPath = 'url(#' + pathId + ')';
     style.offsetAnchor = '0 0';
     style.offsetDistance = '0%';
     style.offsetRotate = anim.autoOrient ? 'auto' : '0deg';

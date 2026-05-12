@@ -41,6 +41,18 @@ export interface PxValidationContext {
     errors: Array<string>;
     /** Per-field warnings — same format as errors but non-fatal. */
     warnings: Array<string>;
+    /**
+     * When true, closed objects (`px.object` / `px.extendedObject`) report any
+     * extra (undeclared) keys as errors. Default `false` (or omitted) — extras
+     * are ignored, matching `sanitize`'s strip-extras behaviour, which is what
+     * production app code wants (forward-compat with unknown future fields).
+     * Tests that want to lock the wire shape down to its declared schema
+     * should pass `strict: true`.
+     *
+     * Open objects (`px.openObject`) are unaffected by `strict` — they accept
+     * extras by design (used for SVG element nodes that carry arbitrary attrs).
+     */
+    strict?: boolean;
 }
 
 export interface PxSchema<T, IsOptional extends boolean = false> {
@@ -361,6 +373,17 @@ class Obj<S extends AnyShape> extends Base<InferShape<S>> {
             p.push(key);
             if (!this._shape[key].isValid(obj[key], ctx, p)) ok = false;
             p.pop();
+        }
+        // Strict mode: closed objects reject extra (undeclared) keys.
+        // Default mode silently ignores them (matching `sanitize`'s strip-extras).
+        if (ctx?.strict) {
+            for (const key of Object.keys(obj)) {
+                if (key in this._shape) continue;
+                p.push(key);
+                ctx.errors.push(pathStr(p) + ': unexpected extra key');
+                p.pop();
+                ok = false;
+            }
         }
         return ok;
     }
